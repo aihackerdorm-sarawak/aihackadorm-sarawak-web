@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, ExternalLink, Mail, Sparkles, Trophy } from "lucide-react";
 import { GraphicsModeProvider, useGraphicsMode } from "./GraphicsMode";
@@ -21,6 +22,13 @@ type ScheduleItem = {
   copy: string;
   badge?: string;
   status?: string;
+};
+
+type CountdownValues = {
+  days: string;
+  hours: string;
+  minutes: string;
+  seconds: string;
 };
 
 const scheduleItems: ScheduleItem[] = [
@@ -191,13 +199,98 @@ function PrimaryButton({
   );
 }
 
+function CountdownLabels() {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-4 z-20 px-4 sm:top-5 sm:px-6">
+      <div className="grid gap-4 text-center md:grid-cols-4">
+        {[
+          ["days", "Days"],
+          ["hours", "Hours"],
+          ["minutes", "Mins"],
+          ["seconds", "Secs"],
+        ].map(([key, label]) => (
+          <div key={key} className="space-y-2">
+            <div className="font-mono text-[10px] uppercase tracking-[0.42em] text-white/42">
+              {label}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CountdownWebGLFrame({
+  active,
+  reducedMotion,
+  quality,
+  headerHeightPx,
+  values,
+}: {
+  active: boolean;
+  reducedMotion: boolean;
+  quality: "low" | "medium" | "high";
+  headerHeightPx: number;
+  values: CountdownValues;
+}) {
+  return (
+    <div className="relative min-h-[300px] overflow-hidden rounded-[30px] border border-white/10 bg-black/40">
+      <CountdownLabels />
+      <CountdownScene
+        active={active}
+        reducedMotion={reducedMotion}
+        quality={quality}
+        headerHeightPx={headerHeightPx}
+        countdown={values}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_42%)]" />
+    </div>
+  );
+}
+
+class CountdownWebGLErrorBoundary extends Component<
+  {
+    values: CountdownValues;
+    stageLabel: string;
+    completed: boolean;
+    message?: string;
+    children: ReactNode;
+  },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error(error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <CountdownFallback
+          values={this.props.values}
+          stageLabel={this.props.stageLabel}
+          completed={this.props.completed}
+          message={this.props.message}
+        />
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function CountdownFallback({
   values,
   stageLabel,
   completed,
   message,
 }: {
-  values: { days: string; hours: string; minutes: string; seconds: string };
+  values: CountdownValues;
   stageLabel: string;
   completed: boolean;
   message?: string;
@@ -246,6 +339,15 @@ function CountdownSection() {
   const { stage, values } = useCountdownState();
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeightPx, setHeaderHeightPx] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setIsMounted(true);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const element = headerRef.current;
@@ -265,6 +367,10 @@ function CountdownSection() {
 
     return () => observer.disconnect();
   }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <section
@@ -289,16 +395,20 @@ function CountdownSection() {
         </div>
 
         {graphicsEnabled && !stage.completed ? (
-          <div className="relative min-h-[300px] overflow-hidden rounded-[30px] border border-white/10 bg-black/40">
-            <CountdownScene
+          <CountdownWebGLErrorBoundary
+            values={values}
+            stageLabel={stage.eyebrow}
+            completed={stage.completed}
+            message={stage.message}
+          >
+            <CountdownWebGLFrame
               active={isInView}
               reducedMotion={reducedMotion}
               quality="medium"
               headerHeightPx={headerHeightPx}
-              countdown={values}
+              values={values}
             />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_42%)]" />
-          </div>
+          </CountdownWebGLErrorBoundary>
         ) : (
           <CountdownFallback
             values={values}
@@ -311,7 +421,7 @@ function CountdownSection() {
         {!stage.completed ? (
           <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.36em] text-white/32">
             <span>{stage.label}</span>
-            <span>•</span>
+            <span>-</span>
             <span>
               {values.days}:{values.hours}:{values.minutes}:{values.seconds}
             </span>
@@ -551,26 +661,32 @@ function CollaboratorsSection() {
     <SectionReveal id="collaborators" className="scroll-mt-28" delay={0.1}>
       <SectionShell
         eyebrow="Collaborators"
-        title="Ai HackerDorm × Swinburne"
+        title="AI HackerDorm x Swinburne"
         copy="Two organizers, one shared build room."
       >
         <div className="grid gap-4 md:grid-cols-2">
           {[
             {
-              mark: "AIH",
               name: "AI HackerDorm",
+              logo: "/AI-Hackadorm.png",
               copy: "Student-led community focused on building AI capability, momentum, and useful collaboration across the region.",
             },
             {
-              mark: "SWB",
               name: "Swinburne Sarawak",
+              logo: "/Swinburne-Logo.jpg",
               copy: "University partner bringing academic support, venue context, and a pathway to student participation.",
             },
           ].map((item) => (
             <div key={item.name} className="rounded-[24px] border border-white/10 bg-black/30 p-5">
               <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-black tracking-[0.16em] text-white">
-                  {item.mark}
+                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5">
+                  <Image
+                    src={item.logo}
+                    alt={item.name}
+                    fill
+                    sizes="64px"
+                    className="object-contain p-2"
+                  />
                 </div>
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">

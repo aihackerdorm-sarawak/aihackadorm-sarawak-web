@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ChevronDown, Menu, Sparkles } from "lucide-react";
 import { useGraphicsMode } from "./GraphicsMode";
 
@@ -16,8 +17,15 @@ const navItems = [
 
 function LogoMark() {
   return (
-    <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[10px] font-black tracking-[0.18em] text-white">
-      AI
+    <span className="relative flex h-10 w-[140px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <Image
+        src="/AI-Hackadorm-Nav.jpg"
+        alt="AI HackerDorm Sarawak"
+        fill
+        priority
+        sizes="140px"
+        className="object-contain p-1.5"
+      />
     </span>
   );
 }
