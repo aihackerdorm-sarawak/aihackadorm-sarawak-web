@@ -1,344 +1,112 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { WAVE_EVENT, type RippleDetail } from "@/lib/wave-events";
+import { useMemo, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import type { Mesh, ShaderMaterial } from "three";
 
-const DOT_SPACING = 15;
-const DOT_RADIUS = 2;
-const SPRING_K = 0.15;
-const DAMPING = 0.5;
-const MOUSE_RADIUS = 140;
-const MOUSE_FORCE = 1.5;
-const WAVE_MAX_RADIUS = 620;
-const WAVE_SPEED = 300;
-const WAVE_FORCE = 10;
-const WAVE_WIDTH = 50;
-
-interface Dot {
-  baseX: number;
-  baseY: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-}
-
-interface Ripple {
-  x: number;
-  y: number;
-  radius: number;
-  life: number;
-  maxRadius: number;
-  forceMul: number;
-}
-
-const AMBIENT_MAX_RADIUS = 320;
-const AMBIENT_FORCE = 9;
-const AMBIENT_INTERVAL_MIN = 3000;
-const AMBIENT_INTERVAL_MAX = 7000;
-
-export type AmbientRippleConfig = {
-  maxRadius?: number;
-  force?: number;
-  intervalMin?: number;
-  intervalMax?: number;
-  countPerBurst?: number;
+type WaveBackgroundProps = {
+  active: boolean;
 };
 
-function toCanvasCoords(
-  clientX: number,
-  clientY: number,
-  canvas: HTMLCanvasElement
-) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  return {
-    x: (clientX - rect.left) * scaleX,
-    y: (clientY - rect.top) * scaleY,
-  };
+const vertexShader = `
+varying vec2 vUv;
+varying float vHeight;
+
+uniform float uTime;
+
+float wave(vec2 uv) {
+  float a = sin(uv.x * 5.0 + uTime * 0.16);
+  float b = sin(uv.y * 4.0 - uTime * 0.12);
+  float c = sin((uv.x + uv.y) * 3.5 + uTime * 0.1);
+  float d = sin(length(uv - 0.5) * 9.0 - uTime * 0.08);
+  return a * 0.45 + b * 0.35 + c * 0.2 + d * 0.15;
 }
 
-export default function WaveBackground({
-  dotColor = "rgba(156, 163, 175, 0.5)",
-  ambient = {},
-}: {
-  dotColor?: string;
-  ambient?: AmbientRippleConfig;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+void main() {
+  vUv = uv;
+  float h = wave(uv);
+  vHeight = h;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  vec3 displaced = position;
+  displaced.z += h * 0.55;
+  displaced.x += sin(uv.y * 6.0 + uTime * 0.08) * 0.08;
+  displaced.y += cos(uv.x * 5.5 - uTime * 0.07) * 0.06;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+}
+`;
 
-    let dots: Dot[] = [];
-    let ripples: Ripple[] = [];
-    let mouseX = -10000;
-    let mouseY = -10000;
-    let mouseOnPage = false;
-    let animId = 0;
+const fragmentShader = `
+varying vec2 vUv;
+varying float vHeight;
 
-    const initDots = () => {
-      dots = [];
-      const cols = Math.floor(window.innerWidth / DOT_SPACING);
-      const rows = Math.floor(window.innerHeight / DOT_SPACING);
-      const offsetX =
-        (window.innerWidth - cols * DOT_SPACING) / 2 + DOT_SPACING / 2;
-      const offsetY =
-        (window.innerHeight - rows * DOT_SPACING) / 2 + DOT_SPACING / 2;
+void main() {
+  float rim = 1.0 - smoothstep(0.25, 0.92, distance(vUv, vec2(0.5)));
+  float heightGlow = smoothstep(-0.65, 0.65, vHeight);
+  float shade = mix(0.06, 0.22, heightGlow);
+  vec3 color = vec3(shade);
+  float alpha = 0.18 + rim * 0.08;
+  gl_FragColor = vec4(color, alpha);
+}
+`;
 
-      for (let c = 0; c < cols; c++) {
-        for (let r = 0; r < rows; r++) {
-          const x = offsetX + c * DOT_SPACING;
-          const y = offsetY + r * DOT_SPACING;
-          dots.push({ baseX: x, baseY: y, x, y, vx: 0, vy: 0 });
-        }
-      }
-    };
+function WavePlane() {
+  const meshRef = useRef<Mesh>(null!);
+  const materialRef = useRef<ShaderMaterial>(null!);
 
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
-      initDots();
-    };
+  useFrame((state) => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+    }
 
-    const addRipple = (cx: number, cy: number, maxRadius = WAVE_MAX_RADIUS, forceMul = 1) => {
-      const coords = toCanvasCoords(cx, cy, canvas);
-      ripples.push({
-        x: coords.x,
-        y: coords.y,
-        radius: 0,
-        life: 1,
-        maxRadius,
-        forceMul,
-      });
-    };
-
-    const maxRadius = ambient.maxRadius ?? AMBIENT_MAX_RADIUS;
-    const forceVal = ambient.force ?? AMBIENT_FORCE;
-    const intervalMin = ambient.intervalMin ?? AMBIENT_INTERVAL_MIN;
-    const intervalMax = ambient.intervalMax ?? AMBIENT_INTERVAL_MAX;
-    const countPerBurst = ambient.countPerBurst ?? 2;
-
-    const spawnAmbientRipple = () => {
-      ripples.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        radius: 0,
-        life: 1,
-        maxRadius: maxRadius + Math.random() * (maxRadius * 0.25),
-        forceMul: forceVal / WAVE_FORCE,
-      });
-    };
-
-    const addPerimeterRipples = (r: {
-      top: number;
-      left: number;
-      width: number;
-      height: number;
-    }) => {
-      const perimeter = 2 * (r.width + r.height);
-      const count = Math.max(8, Math.min(24, Math.round(perimeter / 20)));
-      const corners: [number, number][] = [
-        [r.left, r.top],
-        [r.left + r.width, r.top],
-        [r.left + r.width, r.top + r.height],
-        [r.left, r.top + r.height],
-      ];
-      const edges: [number, number, number, number][] = [
-        [corners[0][0], corners[0][1], corners[1][0], corners[1][1]],
-        [corners[1][0], corners[1][1], corners[2][0], corners[2][1]],
-        [corners[2][0], corners[2][1], corners[3][0], corners[3][1]],
-        [corners[3][0], corners[3][1], corners[0][0], corners[0][1]],
-      ];
-      const totalLen = edges.reduce(
-        (sum, [x1, y1, x2, y2]) => sum + Math.hypot(x2 - x1, y2 - y1),
-        0
-      );
-
-      for (let i = 0; i < count; i++) {
-        const targetDist = (i / count) * totalLen;
-        let traveled = 0;
-        for (const [x1, y1, x2, y2] of edges) {
-          const edgeLen = Math.hypot(x2 - x1, y2 - y1);
-          if (traveled + edgeLen >= targetDist) {
-            const t = (targetDist - traveled) / edgeLen;
-            const px = x1 + (x2 - x1) * t;
-            const py = y1 + (y2 - y1) * t;
-            addRipple(px, py);
-            break;
-          }
-          traveled += edgeLen;
-        }
-      }
-    };
-
-    const update = (dt: number) => {
-      const clampedDt = Math.min(dt, 32);
-      const factor = clampedDt / 16;
-
-      for (let i = dots.length - 1; i >= 0; i--) {
-        const d = dots[i];
-
-        d.vx += (d.baseX - d.x) * SPRING_K;
-        d.vy += (d.baseY - d.y) * SPRING_K;
-
-        if (mouseOnPage) {
-          const dx = d.x - mouseX;
-          const dy = d.y - mouseY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < MOUSE_RADIUS && dist > 0.1) {
-            const force =
-              MOUSE_FORCE *
-              (1 - dist / MOUSE_RADIUS) *
-              (1 - dist / MOUSE_RADIUS);
-            d.vx += (dx / dist) * force;
-            d.vy += (dy / dist) * force;
-          }
-        }
-
-        for (let r = 0; r < ripples.length; r++) {
-          const ripple = ripples[r];
-          const dx = d.x - ripple.x;
-          const dy = d.y - ripple.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const distFromRing = Math.abs(dist - ripple.radius);
-
-          if (distFromRing < WAVE_WIDTH && dist > 0.1) {
-            const ringInfluence = 1 - distFromRing / WAVE_WIDTH;
-            const force =
-              WAVE_FORCE *
-              ripple.forceMul *
-              ringInfluence *
-              ringInfluence *
-              ripple.life;
-            d.vx += (dx / dist) * force;
-            d.vy += (dy / dist) * force;
-          }
-        }
-
-        d.x += d.vx * factor;
-        d.y += d.vy * factor;
-
-        d.vx *= DAMPING;
-        d.vy *= DAMPING;
-
-        if (Math.abs(d.vx) > 30) d.vx = 30 * Math.sign(d.vx);
-        if (Math.abs(d.vy) > 30) d.vy = 30 * Math.sign(d.vy);
-      }
-
-      for (let r = ripples.length - 1; r >= 0; r--) {
-        const ripple = ripples[r];
-        ripple.radius += (WAVE_SPEED * clampedDt) / 1000;
-        ripple.life = Math.max(0, 1 - ripple.radius / ripple.maxRadius);
-        if (ripple.radius > ripple.maxRadius) {
-          ripples.splice(r, 1);
-        }
-      }
-    };
-
-    const draw = () => {
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-
-      ctx.fillStyle = "#020617";
-      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-
-      ctx.fillStyle = dotColor;
-      for (let i = 0; i < dots.length; i++) {
-        const d = dots[i];
-        ctx.beginPath();
-        ctx.arc(d.x, d.y, DOT_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    };
-
-    let lastTime = performance.now();
-
-    const loop = (time: number) => {
-      const dt = time - lastTime;
-      lastTime = time;
-      update(dt);
-      draw();
-      animId = requestAnimationFrame(loop);
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const coords = toCanvasCoords(e.clientX, e.clientY, canvas);
-      mouseX = coords.x;
-      mouseY = coords.y;
-    };
-
-    const handleMouseEnter = () => {
-      mouseOnPage = true;
-    };
-
-    const handleMouseLeave = () => {
-      mouseOnPage = false;
-    };
-
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest("button, a, input, [role='button']")) return;
-      addRipple(e.clientX, e.clientY);
-    };
-
-    const handleCustomRipple = (e: Event) => {
-      const detail = (e as CustomEvent<RippleDetail>).detail;
-      if (detail.rect) {
-        addPerimeterRipples(detail.rect);
-      } else {
-        addRipple(detail.x, detail.y);
-      }
-    };
-
-    let ambientTimer: number;
-    const scheduleAmbient = () => {
-      const delay = intervalMin + Math.random() * (intervalMax - intervalMin);
-      ambientTimer = window.setTimeout(() => {
-        const burst = countPerBurst + Math.floor(Math.random() * (countPerBurst + 1));
-        for (let i = 0; i < burst; i++) {
-          spawnAmbientRipple();
-        }
-        scheduleAmbient();
-      }, delay);
-    };
-    scheduleAmbient();
-    for (let i = 0; i < countPerBurst; i++) spawnAmbientRipple();
-
-    resize();
-    animId = requestAnimationFrame(loop);
-
-    window.addEventListener("resize", resize);
-    window.addEventListener(WAVE_EVENT, handleCustomRipple);
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseenter", handleMouseEnter);
-    document.addEventListener("mouseleave", handleMouseLeave);
-    document.addEventListener("click", handleDocumentClick);
-
-    return () => {
-      cancelAnimationFrame(animId);
-      window.clearTimeout(ambientTimer);
-      window.removeEventListener("resize", resize);
-      window.removeEventListener(WAVE_EVENT, handleCustomRipple);
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseenter", handleMouseEnter);
-      document.removeEventListener("mouseleave", handleMouseLeave);
-      document.removeEventListener("click", handleDocumentClick);
-    };
-  }, [dotColor, ambient.maxRadius, ambient.force, ambient.intervalMin, ambient.intervalMax, ambient.countPerBurst]);
+    if (meshRef.current) {
+      meshRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.03) * 0.01;
+    }
+  });
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0"
-      style={{ zIndex: -1 }}
-      aria-hidden="true"
-    />
+    <mesh ref={meshRef} rotation={[-0.25, 0, 0]}>
+      <planeGeometry args={[12, 7, 180, 120]} />
+      <shaderMaterial
+        ref={materialRef}
+        vertexShader={vertexShader}
+        fragmentShader={fragmentShader}
+        transparent
+        depthWrite={false}
+        uniforms={{
+          uTime: { value: 0 },
+        }}
+      />
+    </mesh>
+  );
+}
+
+export function WaveBackground({ active }: WaveBackgroundProps) {
+  const glConfig = useMemo(
+    () => ({
+      alpha: true,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      powerPreference: "high-performance" as const,
+    }),
+    []
+  );
+
+  return (
+    <Canvas
+      frameloop={active ? "always" : "demand"}
+      dpr={[1, 1.5]}
+      gl={glConfig}
+      camera={{ position: [0, 0, 5.5], fov: 42 }}
+      className="h-full w-full"
+      style={{ touchAction: "none" }}
+    >
+      <color attach="background" args={["#030303"]} />
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[3, 4, 5]} intensity={0.9} color="#f4f4f4" />
+      <directionalLight position={[-3, -2, -4]} intensity={0.3} color="#9a9a9a" />
+      <WavePlane />
+    </Canvas>
   );
 }

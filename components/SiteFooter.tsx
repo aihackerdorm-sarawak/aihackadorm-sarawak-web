@@ -1,65 +1,35 @@
 "use client";
 
-const sponsors = [
-  "University Partner",
-  "Innovation Lab",
-  "Cloud Sponsor",
-  "Mentor Collective",
-];
+import { ArrowUpRight } from "lucide-react";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-white/10">
-      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-3">
-            <p className="font-mono text-[11px] uppercase tracking-[0.34em] text-cyan-200">
-              Sponsor strip
+    <footer className="border-t border-white/10 bg-black/40">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-white/40">
+              aihackadorm.sarawak
             </p>
-            <div className="flex flex-wrap gap-3">
-              {sponsors.map((sponsor) => (
-                <span
-                  key={sponsor}
-                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300"
-                >
-                  {sponsor}
-                </span>
-              ))}
-            </div>
+            <p className="mt-2 text-sm text-white/65">
+              AI Hackadorm 2026 · Sarawak · Built for builders.
+            </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
-              <p className="font-mono text-[11px] uppercase tracking-[0.34em] text-gray-500">
-                Contact
-              </p>
-              <a
-                href="mailto:partnerships@aihackadorm.dev"
-                className="mt-2 block text-lg text-white transition-colors hover:text-cyan-200"
-              >
-                partnerships@aihackadorm.dev
-              </a>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
-              <p className="font-mono text-[11px] uppercase tracking-[0.34em] text-gray-500">
-                Social
-              </p>
-              <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-300">
-                <a href="#" className="transition-colors hover:text-white">
-                  X / Twitter
-                </a>
-                <a href="#" className="transition-colors hover:text-white">
-                  LinkedIn
-                </a>
-                <a href="#" className="transition-colors hover:text-white">
-                  Instagram
-                </a>
-              </div>
-            </div>
-          </div>
+          <a
+            href="#hero"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.26em] text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
+          >
+            Back to top
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
         </div>
+
+        <p className="text-[11px] uppercase tracking-[0.28em] text-white/28">
+          © 2026 AI HackerDorm & Swinburne Sarawak
+        </p>
       </div>
     </footer>
   );
 }
+
