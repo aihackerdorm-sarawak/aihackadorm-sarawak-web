@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { AdaptiveDpr, AdaptiveEvents, PerformanceMonitor } from "@react-three/drei";
-import { BufferGeometry, BufferAttribute, Plane, Vector2, Vector3 } from "three";
-import type { Points as ThreePoints, ShaderMaterial } from "three";
-import { AdditiveBlending } from "three";
+import { AdaptiveDpr, AdaptiveEvents } from "@react-three/drei";
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Plane, Vector2, Vector3 } from "three";
+import type { ShaderMaterial } from "three";
 
 type QualityTier = "low" | "medium" | "high";
 
@@ -24,17 +23,17 @@ type CountdownSettings = {
   colonResolution: number;
   digitSamples: number;
   colonSamples: number;
-  glyphWidth: number;
-  glyphHeight: number;
-  glyphWidthScale: number;
+  digitWidth: number;
+  digitHeight: number;
+  digitWidthScale: number;
   digitStep: number;
   groupSpacingX: number;
   groupSpacingY: number;
-  separatorWidth: number;
-  separatorHeight: number;
+  colonWidth: number;
+  colonHeight: number;
   pointSizeMin: number;
   pointSizeMax: number;
-  pointSizeScale: number;
+  pointScale: number;
 };
 
 type ParticleSystem = {
@@ -76,12 +75,12 @@ void main() {
   vColor = aColor;
 
   vec3 displaced = position;
-  displaced.z += sin(uTime * 1.05 + position.x * 0.82 + position.y * 1.1) * 0.018;
-  displaced.x += sin(uTime * 0.32 + position.y * 1.45) * 0.004;
-  displaced.y += cos(uTime * 0.28 + position.x * 1.05) * 0.003;
+  displaced.z += sin(uTime * 0.8 + position.x * 1.25 + position.y * 0.9) * 0.012;
+  displaced.x += sin(uTime * 0.35 + position.y * 1.1) * 0.0035;
+  displaced.y += cos(uTime * 0.28 + position.x * 1.05) * 0.0025;
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
-  float perspective = 240.0 / max(0.001, -mvPosition.z);
+  float perspective = 245.0 / max(0.001, -mvPosition.z);
 
   gl_PointSize = aSize * uPointScale * uLayerScale * perspective;
   gl_Position = projectionMatrix * mvPosition;
@@ -97,15 +96,15 @@ uniform float uSoftness;
 void main() {
   vec2 uv = gl_PointCoord - vec2(0.5);
   float dist = length(uv);
+  float glow = 1.0 - smoothstep(0.14, 0.5, dist);
+  float core = 1.0 - smoothstep(0.0, 0.42, dist);
+  float alpha = mix(core, core * 0.6 + glow * 0.4, uSoftness);
 
-  float glow = 1.0 - smoothstep(0.16, 0.5, dist);
-  float softCore = 1.0 - smoothstep(0.0, 0.46, dist);
-  float hardCore = step(dist, 0.42);
-
-  float alpha = mix(hardCore, softCore * 0.74 + glow * 0.26, uSoftness);
   gl_FragColor = vec4(vColor, alpha * uOpacity);
 }
 `;
+
+const MONO_TONES = ["#ffffff", "#e0e0e0", "#9a9a9a"] as const;
 
 function scaleWithViewport(value: number, viewportScale: number, influence: number) {
   return value * (1 + (viewportScale - 1) * influence);
@@ -114,60 +113,60 @@ function scaleWithViewport(value: number, viewportScale: number, influence: numb
 function getSettings(quality: QualityTier, viewportScale = 1): CountdownSettings {
   if (quality === "high") {
     return {
-      digitResolution: Math.round(scaleWithViewport(88, viewportScale, 0.35)),
-      colonResolution: Math.round(scaleWithViewport(124, viewportScale, 0.4)),
-      digitSamples: Math.round(scaleWithViewport(240, viewportScale, 0.08)),
-      colonSamples: Math.round(scaleWithViewport(112, viewportScale, 0.08)),
-      glyphWidth: scaleWithViewport(0.54, viewportScale, 0.1),
-      glyphHeight: scaleWithViewport(0.94, viewportScale, 0.08),
-      glyphWidthScale: scaleWithViewport(1.38, viewportScale, 0.16),
-      digitStep: scaleWithViewport(0.58, viewportScale, 0.9),
-      groupSpacingX: scaleWithViewport(1.88, viewportScale, 0.92),
-      groupSpacingY: scaleWithViewport(1.08, viewportScale, 0.18),
-      separatorWidth: scaleWithViewport(0.18, viewportScale, 0.08),
-      separatorHeight: scaleWithViewport(0.52, viewportScale, 0.08),
-      pointSizeMin: scaleWithViewport(0.048, viewportScale, 0.1),
-      pointSizeMax: scaleWithViewport(0.094, viewportScale, 0.1),
-      pointSizeScale: scaleWithViewport(4.25, viewportScale, 0.18),
+      digitResolution: Math.round(scaleWithViewport(84, viewportScale, 0.28)),
+      colonResolution: Math.round(scaleWithViewport(120, viewportScale, 0.34)),
+      digitSamples: Math.round(scaleWithViewport(156, viewportScale, 0.08)),
+      colonSamples: Math.round(scaleWithViewport(72, viewportScale, 0.06)),
+      digitWidth: scaleWithViewport(0.56, viewportScale, 0.08),
+      digitHeight: scaleWithViewport(0.94, viewportScale, 0.08),
+      digitWidthScale: scaleWithViewport(1.34, viewportScale, 0.12),
+      digitStep: scaleWithViewport(0.62, viewportScale, 0.82),
+      groupSpacingX: scaleWithViewport(1.86, viewportScale, 0.84),
+      groupSpacingY: scaleWithViewport(1.1, viewportScale, 0.18),
+      colonWidth: scaleWithViewport(0.18, viewportScale, 0.05),
+      colonHeight: scaleWithViewport(0.56, viewportScale, 0.05),
+      pointSizeMin: scaleWithViewport(0.028, viewportScale, 0.08),
+      pointSizeMax: scaleWithViewport(0.05, viewportScale, 0.08),
+      pointScale: scaleWithViewport(3.9, viewportScale, 0.12),
     };
   }
 
   if (quality === "low") {
     return {
-      digitResolution: Math.round(scaleWithViewport(48, viewportScale, 0.3)),
-      colonResolution: Math.round(scaleWithViewport(88, viewportScale, 0.36)),
-      digitSamples: Math.round(scaleWithViewport(132, viewportScale, 0.06)),
-      colonSamples: Math.round(scaleWithViewport(72, viewportScale, 0.06)),
-      glyphWidth: scaleWithViewport(0.48, viewportScale, 0.09),
-      glyphHeight: scaleWithViewport(0.9, viewportScale, 0.07),
-      glyphWidthScale: scaleWithViewport(1.32, viewportScale, 0.14),
-      digitStep: scaleWithViewport(0.54, viewportScale, 0.82),
-      groupSpacingX: scaleWithViewport(1.72, viewportScale, 0.88),
+      digitResolution: Math.round(scaleWithViewport(48, viewportScale, 0.24)),
+      colonResolution: Math.round(scaleWithViewport(88, viewportScale, 0.3)),
+      digitSamples: Math.round(scaleWithViewport(104, viewportScale, 0.06)),
+      colonSamples: Math.round(scaleWithViewport(52, viewportScale, 0.05)),
+      digitWidth: scaleWithViewport(0.5, viewportScale, 0.06),
+      digitHeight: scaleWithViewport(0.9, viewportScale, 0.06),
+      digitWidthScale: scaleWithViewport(1.28, viewportScale, 0.1),
+      digitStep: scaleWithViewport(0.58, viewportScale, 0.76),
+      groupSpacingX: scaleWithViewport(1.7, viewportScale, 0.8),
       groupSpacingY: scaleWithViewport(1.0, viewportScale, 0.16),
-      separatorWidth: scaleWithViewport(0.16, viewportScale, 0.06),
-      separatorHeight: scaleWithViewport(0.46, viewportScale, 0.06),
-      pointSizeMin: scaleWithViewport(0.042, viewportScale, 0.08),
-      pointSizeMax: scaleWithViewport(0.082, viewportScale, 0.08),
-      pointSizeScale: scaleWithViewport(3.85, viewportScale, 0.14),
+      colonWidth: scaleWithViewport(0.16, viewportScale, 0.05),
+      colonHeight: scaleWithViewport(0.48, viewportScale, 0.05),
+      pointSizeMin: scaleWithViewport(0.024, viewportScale, 0.06),
+      pointSizeMax: scaleWithViewport(0.042, viewportScale, 0.06),
+      pointScale: scaleWithViewport(3.2, viewportScale, 0.1),
     };
   }
 
   return {
-    digitResolution: Math.round(scaleWithViewport(72, viewportScale, 0.32)),
-    colonResolution: Math.round(scaleWithViewport(104, viewportScale, 0.36)),
-    digitSamples: Math.round(scaleWithViewport(184, viewportScale, 0.07)),
-    colonSamples: Math.round(scaleWithViewport(92, viewportScale, 0.07)),
-    glyphWidth: scaleWithViewport(0.5, viewportScale, 0.09),
-    glyphHeight: scaleWithViewport(0.92, viewportScale, 0.07),
-    glyphWidthScale: scaleWithViewport(1.34, viewportScale, 0.14),
-    digitStep: scaleWithViewport(0.56, viewportScale, 0.84),
-    groupSpacingX: scaleWithViewport(1.8, viewportScale, 0.9),
+    digitResolution: Math.round(scaleWithViewport(68, viewportScale, 0.26)),
+    colonResolution: Math.round(scaleWithViewport(104, viewportScale, 0.3)),
+    digitSamples: Math.round(scaleWithViewport(130, viewportScale, 0.07)),
+    colonSamples: Math.round(scaleWithViewport(60, viewportScale, 0.05)),
+    digitWidth: scaleWithViewport(0.52, viewportScale, 0.06),
+    digitHeight: scaleWithViewport(0.92, viewportScale, 0.06),
+    digitWidthScale: scaleWithViewport(1.3, viewportScale, 0.1),
+    digitStep: scaleWithViewport(0.6, viewportScale, 0.78),
+    groupSpacingX: scaleWithViewport(1.78, viewportScale, 0.82),
     groupSpacingY: scaleWithViewport(1.04, viewportScale, 0.16),
-    separatorWidth: scaleWithViewport(0.17, viewportScale, 0.06),
-    separatorHeight: scaleWithViewport(0.5, viewportScale, 0.06),
-    pointSizeMin: scaleWithViewport(0.044, viewportScale, 0.08),
-    pointSizeMax: scaleWithViewport(0.086, viewportScale, 0.08),
-    pointSizeScale: scaleWithViewport(4.0, viewportScale, 0.16),
+    colonWidth: scaleWithViewport(0.17, viewportScale, 0.05),
+    colonHeight: scaleWithViewport(0.5, viewportScale, 0.05),
+    pointSizeMin: scaleWithViewport(0.026, viewportScale, 0.07),
+    pointSizeMax: scaleWithViewport(0.046, viewportScale, 0.07),
+    pointScale: scaleWithViewport(3.55, viewportScale, 0.11),
   };
 }
 
@@ -194,22 +193,21 @@ function mixRgb(a: ReturnType<typeof hexToRgb>, b: ReturnType<typeof hexToRgb>, 
   };
 }
 
-const COLOR_STOPS = [hexToRgb("#ffffff"), hexToRgb("#d4d4d4"), hexToRgb("#8a8a8a")] as const;
+const TONE_RGB = MONO_TONES.map(hexToRgb);
 
-function getParticleColor(toneRoll: number, pointMix: number, isBright: boolean) {
-  if (toneRoll < 0.5) {
-    return COLOR_STOPS[0];
+function getParticleColor(seedA: number, seedB: number) {
+  const toneRoll = hash01(seedA);
+  const accentRoll = hash01(seedB);
+
+  if (toneRoll < 0.52) {
+    return TONE_RGB[0];
   }
 
-  if (toneRoll < 0.85) {
-    return isBright
-      ? mixRgb(COLOR_STOPS[0], COLOR_STOPS[1], 0.42 + pointMix * 0.18)
-      : mixRgb(COLOR_STOPS[0], COLOR_STOPS[1], 0.22 + pointMix * 0.2);
+  if (toneRoll < 0.84) {
+    return mixRgb(TONE_RGB[0], TONE_RGB[1], 0.3 + accentRoll * 0.18);
   }
 
-  return isBright
-    ? mixRgb(COLOR_STOPS[1], COLOR_STOPS[2], 0.18 + pointMix * 0.18)
-    : mixRgb(COLOR_STOPS[1], COLOR_STOPS[2], 0.08 + pointMix * 0.14);
+  return mixRgb(TONE_RGB[1], TONE_RGB[2], 0.22 + accentRoll * 0.18);
 }
 
 function sampleGlyphPositions(char: string, resolution: number, sampleCount: number, widthScale: number) {
@@ -227,7 +225,7 @@ function sampleGlyphPositions(char: string, resolution: number, sampleCount: num
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, resolution, resolution);
   ctx.fillStyle = "#fff";
-  ctx.font = `900 ${Math.round(resolution * 0.86)}px "Arial Black", "Segoe UI Black", sans-serif`;
+  ctx.font = `900 ${Math.round(resolution * 0.88)}px "Arial Black", "Segoe UI Black", sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.save();
@@ -245,7 +243,7 @@ function sampleGlyphPositions(char: string, resolution: number, sampleCount: num
       const index = (y * resolution + x) * 4;
       const alpha = data[index + 3];
       const brightness = data[index] + data[index + 1] + data[index + 2];
-      if (alpha > 200 && brightness > 620) {
+      if (alpha > 180 && brightness > 500) {
         rawPoints.push([(x / resolution) * 2 - 1, -((y / resolution) * 2 - 1)]);
       }
     }
@@ -268,22 +266,23 @@ function sampleGlyphPositions(char: string, resolution: number, sampleCount: num
 
 function buildGlyphCache(settings: CountdownSettings) {
   const cache: Record<string, GlyphPoint[]> = {};
-  cache["0"] = sampleGlyphPositions("0", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["1"] = sampleGlyphPositions("1", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["2"] = sampleGlyphPositions("2", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["3"] = sampleGlyphPositions("3", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["4"] = sampleGlyphPositions("4", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["5"] = sampleGlyphPositions("5", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["6"] = sampleGlyphPositions("6", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["7"] = sampleGlyphPositions("7", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["8"] = sampleGlyphPositions("8", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache["9"] = sampleGlyphPositions("9", settings.digitResolution, settings.digitSamples, settings.glyphWidthScale);
-  cache[":"] = sampleGlyphPositions(":", settings.colonResolution, settings.colonSamples, 1.0);
+  for (const char of "0123456789") {
+    cache[char] = sampleGlyphPositions(
+      char,
+      settings.digitResolution,
+      settings.digitSamples,
+      settings.digitWidthScale
+    );
+  }
+
+  cache[":"] = sampleGlyphPositions(":", settings.colonResolution, settings.colonSamples, 1.05);
   return cache;
 }
 
 function useViewportWidth() {
-  const [width, setWidth] = useState(() => (typeof window === "undefined" ? 1024 : window.innerWidth));
+  const [width, setWidth] = useState(() =>
+    typeof window === "undefined" ? 1024 : window.innerWidth
+  );
 
   useEffect(() => {
     const update = () => setWidth(window.innerWidth);
@@ -296,7 +295,9 @@ function useViewportWidth() {
 }
 
 function useViewportHeight() {
-  const [height, setHeight] = useState(() => (typeof window === "undefined" ? 768 : window.innerHeight));
+  const [height, setHeight] = useState(() =>
+    typeof window === "undefined" ? 768 : window.innerHeight
+  );
 
   useEffect(() => {
     const update = () => setHeight(window.innerHeight);
@@ -308,31 +309,24 @@ function useViewportHeight() {
   return height;
 }
 
-function useLayoutMode() {
-  const [isStacked, setIsStacked] = useState(false);
+function useStackedLayout() {
+  const [stacked, setStacked] = useState(false);
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 640px)");
-    const update = () => setIsStacked(query.matches);
-    const legacyQuery = query as MediaQueryList & {
-      addEventListener?: (type: "change", listener: () => void) => void;
-      removeEventListener?: (type: "change", listener: () => void) => void;
-      addListener?: (listener: () => void) => void;
-      removeListener?: (listener: () => void) => void;
-    };
-
+    const update = () => setStacked(query.matches);
     update();
 
-    if (legacyQuery.addEventListener) {
-      legacyQuery.addEventListener("change", update);
-      return () => legacyQuery.removeEventListener?.("change", update);
+    if (query.addEventListener) {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
     }
 
-    legacyQuery.addListener?.(update);
-    return () => legacyQuery.removeListener?.(update);
+    query.addListener(update);
+    return () => query.removeListener(update);
   }, []);
 
-  return isStacked;
+  return stacked;
 }
 
 function pixelsToWorldUnits(px: number, viewportHeightPx: number, cameraViewportHeight: number) {
@@ -343,14 +337,25 @@ function pixelsToWorldUnits(px: number, viewportHeightPx: number, cameraViewport
   return (px / viewportHeightPx) * cameraViewportHeight;
 }
 
-function computeLayout(countdown: CountdownValue, settings: CountdownSettings, isStacked: boolean, sceneOffsetY: number) {
+function computeLayout(
+  countdown: CountdownValue,
+  settings: CountdownSettings,
+  stacked: boolean,
+  sceneOffsetY: number
+) {
   const groups = [countdown.days, countdown.hours, countdown.minutes, countdown.seconds];
-  const digitSpacing = settings.digitStep * settings.glyphWidthScale * 1.08;
-  const stackOffsetY = (isStacked ? -1.15 : -0.6) + sceneOffsetY;
+  const digitSpacing = settings.digitStep * settings.digitWidthScale;
+  const stackOffsetY = sceneOffsetY + (stacked ? -1.1 : -0.55);
 
-  const groupOrigins = isStacked
-    ? [1.5, 0.5, -0.5, -1.5].map((y) => ({ x: 0, y: y * settings.groupSpacingY + stackOffsetY }))
-    : [-1.5, -0.5, 0.5, 1.5].map((x) => ({ x: x * settings.groupSpacingX, y: stackOffsetY }));
+  const groupOrigins = stacked
+    ? [1.5, 0.5, -0.5, -1.5].map((y) => ({
+        x: 0,
+        y: y * settings.groupSpacingY + stackOffsetY,
+      }))
+    : [-1.5, -0.5, 0.5, 1.5].map((x) => ({
+        x: x * settings.groupSpacingX,
+        y: stackOffsetY,
+      }));
 
   const items: LayoutItem[] = [];
 
@@ -363,8 +368,8 @@ function computeLayout(countdown: CountdownValue, settings: CountdownSettings, i
         char: digit,
         originX: origin.x + (digitIndex === 0 ? -digitSpacing / 2 : digitSpacing / 2),
         originY: origin.y,
-        scaleX: settings.glyphWidth,
-        scaleY: settings.glyphHeight,
+        scaleX: settings.digitWidth,
+        scaleY: settings.digitHeight,
         sampleCount: settings.digitSamples,
       });
     });
@@ -373,10 +378,10 @@ function computeLayout(countdown: CountdownValue, settings: CountdownSettings, i
       const nextOrigin = groupOrigins[groupIndex + 1];
       items.push({
         char: ":",
-        originX: isStacked ? 0 : (origin.x + nextOrigin.x) / 2,
+        originX: stacked ? 0 : (origin.x + nextOrigin.x) / 2,
         originY: origin.y,
-        scaleX: settings.separatorWidth,
-        scaleY: settings.separatorHeight,
+        scaleX: settings.colonWidth,
+        scaleY: settings.colonHeight,
         sampleCount: settings.colonSamples,
       });
     }
@@ -385,62 +390,21 @@ function computeLayout(countdown: CountdownValue, settings: CountdownSettings, i
   return items;
 }
 
-function Starfield({ quality, reducedMotion }: { quality: QualityTier; reducedMotion: boolean }) {
-  const pointsRef = useRef<ThreePoints>(null!);
-  const count = quality === "high" ? 150 : quality === "medium" ? 112 : 72;
-
-  const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-
-    for (let index = 0; index < count; index += 1) {
-      const seed = index * 97.31;
-      arr[index * 3] = (hash01(seed + 1.1) - 0.5) * 18;
-      arr[index * 3 + 1] = (hash01(seed + 2.2) - 0.5) * 10.5;
-      arr[index * 3 + 2] = -3.5 - hash01(seed + 3.3) * 4.5;
-    }
-
-    return arr;
-  }, [count]);
-
-  useEffect(() => {
-    if (pointsRef.current) {
-      pointsRef.current.geometry.setAttribute("position", new BufferAttribute(positions, 3));
-    }
-  }, [positions]);
-
-  useFrame((state, delta) => {
-    if (pointsRef.current) {
-      pointsRef.current.rotation.y += delta * (reducedMotion ? 0.002 : 0.006);
-      pointsRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.04) * 0.01;
-    }
-  });
-
-  return (
-    <points ref={pointsRef} renderOrder={0}>
-      <bufferGeometry />
-      <pointsMaterial size={0.011} sizeAttenuation transparent opacity={0.92} depthWrite={false} />
-    </points>
-  );
-}
-
 function getPresentationScale(viewportWidth: number) {
-  if (viewportWidth >= 1440) {
-    return 1.08;
-  }
-
-  if (viewportWidth >= 1024) {
-    return 1.04;
-  }
-
-  if (viewportWidth < 640) {
-    return 0.96;
-  }
-
+  if (viewportWidth >= 1440) return 1.08;
+  if (viewportWidth >= 1024) return 1.04;
+  if (viewportWidth < 640) return 0.96;
   return 1;
 }
 
-function createSystem(countdown: CountdownValue, settings: CountdownSettings, glyphCache: Record<string, GlyphPoint[]>, isStacked: boolean, sceneOffsetY: number) {
-  const layout = computeLayout(countdown, settings, isStacked, sceneOffsetY);
+function createSystem(
+  countdown: CountdownValue,
+  settings: CountdownSettings,
+  glyphCache: Record<string, GlyphPoint[]>,
+  stacked: boolean,
+  sceneOffsetY: number
+) {
+  const layout = computeLayout(countdown, settings, stacked, sceneOffsetY);
   const count = layout.reduce((total, item) => total + item.sampleCount, 0);
   const positions = new Float32Array(count * 3);
   const targets = new Float32Array(count * 3);
@@ -454,51 +418,41 @@ function createSystem(countdown: CountdownValue, settings: CountdownSettings, gl
 
     for (let particleIndex = 0; particleIndex < item.sampleCount; particleIndex += 1) {
       const point = glyph[particleIndex % glyph.length] ?? [0, 0];
-      const jitterSeed = itemIndex * 997 + particleIndex * 53 + item.char.charCodeAt(0) * 11;
-      const flowSeed = itemIndex * 313 + particleIndex * 17 + item.char.charCodeAt(0) * 7;
+      const seed = itemIndex * 997 + particleIndex * 53 + item.char.charCodeAt(0) * 13;
       const offset = (particleOffset + particleIndex) * 3;
       const sizeIndex = particleOffset + particleIndex;
-      const pointMix = hash01(flowSeed);
-      const toneRoll = hash01(jitterSeed + 97);
-      const isBright = hash01(jitterSeed + 41) > 0.86;
 
       const targetX = item.originX + point[0] * item.scaleX;
       const targetY = item.originY + point[1] * item.scaleY;
-      const targetZ = (hash01(jitterSeed + 19) - 0.5) * 0.04;
+      const targetZ = (hash01(seed + 19) - 0.5) * 0.03;
 
       targets[offset] = targetX;
       targets[offset + 1] = targetY;
       targets[offset + 2] = targetZ;
 
-      const settleX = (hash01(jitterSeed) - 0.5) * 0.26;
-      const settleY = (hash01(jitterSeed + 7) - 0.5) * 0.26;
-      const settleZ = (hash01(jitterSeed + 13) - 0.5) * 0.08;
+      const settleX = (hash01(seed) - 0.5) * 0.18;
+      const settleY = (hash01(seed + 7) - 0.5) * 0.18;
+      const settleZ = (hash01(seed + 13) - 0.5) * 0.05;
 
       positions[offset] = targetX + settleX;
       positions[offset + 1] = targetY + settleY;
       positions[offset + 2] = targetZ + settleZ;
 
-      const color = getParticleColor(toneRoll, pointMix, isBright);
+      const color = getParticleColor(seed + 23, seed + 41);
       colors[offset] = color.r / 255;
       colors[offset + 1] = color.g / 255;
       colors[offset + 2] = color.b / 255;
 
       sizes[sizeIndex] =
         settings.pointSizeMin +
-        hash01(jitterSeed + 23) * (settings.pointSizeMax - settings.pointSizeMin) +
-        (isBright ? 0.008 : 0);
+        hash01(seed + 59) * (settings.pointSizeMax - settings.pointSizeMin) +
+        (item.char === ":" ? -0.003 : 0);
     }
 
     particleOffset += item.sampleCount;
   });
 
-  return {
-    positions,
-    targets,
-    colors,
-    sizes,
-    count,
-  };
+  return { positions, targets, colors, sizes, count };
 }
 
 function CountdownParticles({
@@ -518,15 +472,15 @@ function CountdownParticles({
   headerHeightPx: number;
   countdown: CountdownValue;
 }) {
-  const geometry = useMemo(() => new BufferGeometry(), []);
+  const [geometry] = useState(() => new BufferGeometry());
   const positionAttributeRef = useRef<BufferAttribute | null>(null);
   const glowMaterialRef = useRef<ShaderMaterial>(null!);
   const coreMaterialRef = useRef<ShaderMaterial>(null!);
   const pointerPlane = useMemo(() => new Plane(new Vector3(0, 0, 1), 0), []);
   const viewportWidth = useViewportWidth();
   const viewportHeight = useViewportHeight();
-  const isStacked = useLayoutMode();
-  const cameraZ = isStacked ? 8.1 : 7.05;
+  const stacked = useStackedLayout();
+  const cameraZ = stacked ? 8.05 : 7.1;
   const cameraFov = 42;
   const cameraViewportHeight = useMemo(
     () => 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360),
@@ -534,27 +488,30 @@ function CountdownParticles({
   );
   const sceneOffsetY = useMemo(() => {
     const headerWorldHeight = pixelsToWorldUnits(headerHeightPx, viewportHeight, cameraViewportHeight);
-    return -(headerWorldHeight / 2) - 0.38;
+    return -(headerWorldHeight / 2) - 0.35;
   }, [cameraViewportHeight, headerHeightPx, viewportHeight]);
   const presentationScale = useMemo(() => getPresentationScale(viewportWidth), [viewportWidth]);
   const settings = useMemo(() => getSettings(quality, presentationScale), [quality, presentationScale]);
   const glyphCache = useMemo(() => buildGlyphCache(settings), [settings]);
+  const safeCountdown = useMemo(
+    () => countdown ?? { days: "00", hours: "00", minutes: "00", seconds: "00" },
+    [countdown]
+  );
   const [system, setSystem] = useState<ParticleSystem>(() =>
-    createSystem(countdown, settings, glyphCache, isStacked, sceneOffsetY)
+    createSystem(safeCountdown, settings, glyphCache, stacked, sceneOffsetY)
   );
   const systemRef = useRef(system);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      setSystem(createSystem(countdown, settings, glyphCache, isStacked, sceneOffsetY));
+      setSystem(createSystem(safeCountdown, settings, glyphCache, stacked, sceneOffsetY));
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [countdown, glyphCache, isStacked, sceneOffsetY, settings]);
+  }, [glyphCache, safeCountdown, sceneOffsetY, settings, stacked]);
 
   useEffect(() => {
     systemRef.current = system;
-
     geometry.setAttribute("position", new BufferAttribute(system.positions, 3));
     geometry.setAttribute("aColor", new BufferAttribute(system.colors, 3));
     geometry.setAttribute("aSize", new BufferAttribute(system.sizes, 1));
@@ -563,7 +520,7 @@ function CountdownParticles({
 
   useEffect(() => {
     const current = systemRef.current;
-    const layout = computeLayout(countdown, settings, isStacked, sceneOffsetY);
+    const layout = computeLayout(safeCountdown, settings, stacked, sceneOffsetY);
     let particleOffset = 0;
 
     layout.forEach((item, itemIndex) => {
@@ -575,31 +532,37 @@ function CountdownParticles({
 
         current.targets[offset] = item.originX + point[0] * item.scaleX;
         current.targets[offset + 1] = item.originY + point[1] * item.scaleY;
-        current.targets[offset + 2] = (hash01(itemIndex * 313 + particleIndex * 17) - 0.5) * 0.04;
+        current.targets[offset + 2] = (hash01(itemIndex * 313 + particleIndex * 17) - 0.5) * 0.03;
       }
 
       particleOffset += item.sampleCount;
     });
-  }, [countdown, glyphCache, isStacked, sceneOffsetY, settings]);
+  }, [glyphCache, safeCountdown, sceneOffsetY, settings, stacked]);
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
 
   useFrame((state) => {
     const current = systemRef.current;
-    const repelRadius = reducedMotion ? 0.24 : 0.36;
-    const repelStrength = reducedMotion ? 0.11 : 0.18;
-    const damp = reducedMotion ? 0.08 : 0.16;
     const pointer = pointerTarget.current;
+    const repelRadius = reducedMotion ? 0.2 : 0.28;
+    const repelStrength = reducedMotion ? 0.09 : 0.15;
+    const damp = reducedMotion ? 0.09 : 0.14;
 
     if (glowMaterialRef.current) {
       glowMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      glowMaterialRef.current.uniforms.uPointScale.value = settings.pointSizeScale;
+      glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
     }
 
     if (coreMaterialRef.current) {
       coreMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      coreMaterialRef.current.uniforms.uPointScale.value = settings.pointSizeScale;
+      coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
     }
 
-    state.camera.position.z += (cameraZ - state.camera.position.z) * 0.05;
+    state.camera.position.z += (cameraZ - state.camera.position.z) * 0.06;
 
     if (pointerActive.current) {
       state.raycaster.setFromCamera(pointerNdc.current, state.camera);
@@ -621,12 +584,9 @@ function CountdownParticles({
       if (distance < repelRadius) {
         const push = (repelRadius - distance) * repelStrength;
         const inverse = 1 / Math.max(distance, 0.0001);
-        const nx = dx * inverse;
-        const ny = dy * inverse;
-
-        targetX += nx * push;
-        targetY += ny * push;
-        targetZ += (hash01(index * 19 + state.clock.elapsedTime * 3) - 0.5) * push * 0.1;
+        targetX += (dx * inverse) * push;
+        targetY += (dy * inverse) * push;
+        targetZ += (hash01(index * 19 + state.clock.elapsedTime * 2.5) - 0.5) * push * 0.06;
       }
 
       current.positions[offset] += (targetX - current.positions[offset]) * damp;
@@ -641,7 +601,6 @@ function CountdownParticles({
 
   return (
     <group>
-      <Starfield quality={quality} reducedMotion={reducedMotion} />
       <points geometry={geometry} renderOrder={2}>
         <shaderMaterial
           ref={glowMaterialRef}
@@ -652,9 +611,9 @@ function CountdownParticles({
           blending={AdditiveBlending}
           uniforms={{
             uTime: { value: 0 },
-            uPointScale: { value: settings.pointSizeScale },
-            uLayerScale: { value: 1.85 },
-            uOpacity: { value: 0.34 },
+            uPointScale: { value: settings.pointScale },
+            uLayerScale: { value: 1.7 },
+            uOpacity: { value: 0.28 },
             uSoftness: { value: 1 },
           }}
         />
@@ -669,8 +628,8 @@ function CountdownParticles({
           blending={AdditiveBlending}
           uniforms={{
             uTime: { value: 0 },
-            uPointScale: { value: settings.pointSizeScale },
-            uLayerScale: { value: 0.94 },
+            uPointScale: { value: settings.pointScale },
+            uLayerScale: { value: 0.88 },
             uOpacity: { value: 0.94 },
             uSoftness: { value: 0 },
           }}
@@ -690,14 +649,11 @@ export function CountdownScene({
   const pointerTarget = useRef(new Vector3(999, 999, 999));
   const pointerNdc = useRef(new Vector2(0, 0));
   const pointerActive = useRef(false);
-  const [liveQuality, setLiveQuality] = useState<QualityTier>(quality);
-  const dprCap = liveQuality === "high" ? 1.5 : liveQuality === "medium" ? 1.25 : 1;
-  const safeCountdown = countdown ?? {
-    days: "00",
-    hours: "00",
-    minutes: "00",
-    seconds: "00",
-  };
+  const dprCap = quality === "high" ? 1.5 : quality === "medium" ? 1.25 : 1;
+  const safeCountdown = useMemo(
+    () => countdown ?? { days: "00", hours: "00", minutes: "00", seconds: "00" },
+    [countdown]
+  );
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -719,34 +675,26 @@ export function CountdownScene({
       frameloop={active ? "always" : "demand"}
       gl={{
         alpha: true,
-        antialias: liveQuality !== "low",
+      antialias: quality !== "low",
         depth: true,
         stencil: false,
         powerPreference: "high-performance",
       }}
-      camera={{ position: [0, 0, 7.05], fov: 42 }}
+      camera={{ position: [0, 0, 7.1], fov: 42 }}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
       className="h-full w-full"
       style={{ touchAction: "pan-y" }}
     >
       <color attach="background" args={["#030303"]} />
-      <ambientLight intensity={1.5} />
-      <directionalLight position={[4, 6, 8]} intensity={2.1} color="#f2f2f2" />
-      <directionalLight position={[-4, -2, -4]} intensity={0.7} color="#a8a8a8" />
-      <AdaptiveDpr pixelated={liveQuality === "low"} />
+      <ambientLight intensity={1.35} />
+      <directionalLight position={[4, 6, 8]} intensity={1.8} color="#f5f5f5" />
+      <directionalLight position={[-4, -2, -4]} intensity={0.55} color="#b8b8b8" />
+      <AdaptiveDpr pixelated={quality === "low"} />
       <AdaptiveEvents />
-      <PerformanceMonitor
-        onDecline={() => {
-          setLiveQuality((current) => (current === "high" ? "medium" : "low"));
-        }}
-        onIncline={() => {
-          setLiveQuality((current) => (current === "low" ? "medium" : "high"));
-        }}
-      />
       <CountdownParticles
         reducedMotion={reducedMotion}
-        quality={liveQuality}
+        quality={quality}
         pointerTarget={pointerTarget}
         pointerNdc={pointerNdc}
         pointerActive={pointerActive}

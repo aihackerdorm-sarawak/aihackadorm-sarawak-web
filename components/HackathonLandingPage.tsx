@@ -3,23 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import {
-  ArrowRight,
-  CalendarDays,
-  ExternalLink,
-  Mail,
-  Sparkles,
-  Trophy,
-} from "lucide-react";
+import { ArrowRight, ExternalLink, Mail, Sparkles, Trophy } from "lucide-react";
 import { GraphicsModeProvider, useGraphicsMode } from "./GraphicsMode";
 import { SectionReveal } from "./SectionReveal";
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { CountdownScene } from "./CountdownScene";
-import { WaveBackground } from "./WaveBackground";
+import WaveBackground from "./WaveBackground";
 import { formatCountdownParts, getCountdownStage, padTwo } from "@/lib/countdown";
-
-type NavTarget = "hero" | "countdown" | "sponsors" | "schedule" | "benefits" | "collaborators" | "about" | "partner";
 
 type ScheduleItem = {
   id: string;
@@ -440,73 +431,77 @@ function ScheduleSection() {
       <SectionShell
         eyebrow="Schedule"
         title="Key dates."
-        copy="A simple interactive timeline keeps the launch plan legible. Tap a milestone to read the detail card below."
+        copy="Tap a milestone to update the single shared detail card below."
       >
-        <div className="space-y-5">
-          <div className="overflow-x-auto pb-2">
-            <div className="flex min-w-max gap-4">
-              {scheduleItems.map((item) => {
-                const active = item.id === selectedId;
+        <div className="space-y-6">
+          <div className="overflow-x-auto pb-4">
+            <div className="relative min-w-[620px] px-3 py-10">
+              <div className="absolute left-3 right-3 top-1/2 h-px -translate-y-1/2 bg-white/15" />
+              <div className="grid grid-cols-3 gap-4">
+                {scheduleItems.map((item) => {
+                  const active = item.id === selectedId;
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedId(item.id)}
-                    className={`relative min-w-[240px] rounded-[24px] border px-5 py-5 text-left transition-colors ${
-                      active
-                        ? "border-white/30 bg-white/10"
-                        : "border-white/10 bg-black/25 hover:border-white/20 hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                        {item.hint}
-                      </p>
-                      {item.badge ? (
-                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] uppercase tracking-[0.26em] text-white/45">
-                          {item.badge}
-                        </span>
-                      ) : null}
-                    </div>
-                    <h3 className="mt-4 text-xl font-black uppercase tracking-[-0.05em] text-white">
-                      {item.label}
-                    </h3>
-                    <p className="mt-2 text-sm text-white/48">{item.date}</p>
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedId(item.id)}
+                      aria-pressed={active}
+                      className="relative flex min-h-28 flex-col items-center justify-center text-center"
+                    >
+                      <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+                        <span
+                          className={`block h-4 w-4 rounded-full border transition-all ${
+                            active
+                              ? "border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.08)]"
+                              : "border-white/45 bg-[#030303]"
+                          }`}
+                        />
+                      </div>
+
+                      <div className="mb-auto flex flex-col items-center gap-2 px-3">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/45">
+                          {item.hint}
+                        </p>
+                        <h3
+                          className={`text-[11px] font-semibold uppercase tracking-[0.24em] transition-colors ${
+                            active ? "text-white" : "text-white/60"
+                          }`}
+                        >
+                          {item.label}
+                        </h3>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/32">
+                          {item.date}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-            <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/75">
-                  <CalendarDays className="h-4.5 w-4.5" />
-                </div>
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                    Selected milestone
-                  </p>
-                  <h3 className="mt-1 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-                    {selected.title}
-                  </h3>
-                </div>
+          <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+                  Shared detail card
+                </p>
+                <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
+                  {selected.title}
+                </h3>
               </div>
-              <p className="mt-4 text-sm leading-7 text-white/55">{selected.copy}</p>
+              {selected.badge ? (
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45">
+                  {selected.badge}
+                </span>
+              ) : null}
             </div>
-
-            <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
-              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                Status
-              </p>
-              <p className="mt-3 text-3xl font-black uppercase tracking-[-0.06em] text-white">
-                {selected.status ?? "Tentative"}
-              </p>
-              <p className="mt-3 text-sm leading-7 text-white/55">
-                Swipe horizontally on mobile or tap a milestone to update the details card.
-              </p>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
+              <span>{selected.date}</span>
+              <span>-</span>
+              <span>{selected.status ?? "Tentative"}</span>
             </div>
           </div>
         </div>
