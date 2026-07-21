@@ -87,7 +87,10 @@ export function CountdownHero() {
   const { ref, isInView, intersectionRatio } = useInView<HTMLDivElement>();
   const { quality } = useDeviceProfile();
   const headerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<HTMLDivElement>(null);
   const [headerHeightPx, setHeaderHeightPx] = useState(0);
+  const [sceneWidthPx, setSceneWidthPx] = useState(0);
+  const [sceneHeightPx, setSceneHeightPx] = useState(0);
   const opacity = Math.min(1, intersectionRatio / 0.5);
 
   useEffect(() => {
@@ -112,18 +115,44 @@ export function CountdownHero() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const element = sceneRef.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+
+      setSceneWidthPx(entry.contentRect.width);
+      setSceneHeightPx(entry.contentRect.height);
+    });
+
+    const rect = element.getBoundingClientRect();
+    setSceneWidthPx(rect.width);
+    setSceneHeightPx(rect.height);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section
       ref={ref}
       id="countdown"
       className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden border-b border-white/10 px-4 sm:px-6 lg:px-8"
     >
-      <div className="absolute inset-0 z-0">
+      <div ref={sceneRef} className="absolute inset-0 z-0">
         <CountdownScene
           active={isInView}
           reducedMotion={reducedMotion}
           quality={quality}
           headerHeightPx={headerHeightPx}
+          containerWidthPx={sceneWidthPx}
+          containerHeightPx={sceneHeightPx}
         />
       </div>
 

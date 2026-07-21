@@ -27,6 +27,8 @@ type CountdownSceneProps = {
   reducedMotion: boolean;
   quality: QualityTier;
   headerHeightPx: number;
+  containerWidthPx: number;
+  containerHeightPx: number;
   countdown?: CountdownValue;
 };
 
@@ -68,14 +70,22 @@ varying vec3 vColor;
 uniform float uTime;
 uniform float uPointScale;
 uniform float uLayerScale;
+uniform float uSceneWidth;
+uniform float uSceneHeight;
+uniform float uWaveXFrequency;
+uniform float uWaveYFrequency;
 
 void main() {
   vColor = aColor;
 
   vec3 displaced = position;
-  displaced.z += sin(uTime * 0.7 + position.x * 1.12 + position.y * 0.88) * 0.012;
-  displaced.x += sin(uTime * 0.28 + position.y * 1.04) * 0.0028;
-  displaced.y += cos(uTime * 0.24 + position.x * 0.96) * 0.0022;
+  float normalizedX = position.x / max(0.001, uSceneWidth);
+  float normalizedY = position.y / max(0.001, uSceneHeight);
+  float waveX = normalizedX * uWaveXFrequency;
+  float waveY = normalizedY * uWaveYFrequency;
+  displaced.z += sin(uTime * 0.7 + waveX + waveY) * 0.012;
+  displaced.x += sin(uTime * 0.28 + waveY) * 0.0028;
+  displaced.y += cos(uTime * 0.24 + waveX) * 0.0022;
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
   float perspective = 245.0 / max(0.001, -mvPosition.z);
@@ -167,16 +177,29 @@ function pixelsToWorldUnits(px: number, viewportHeightPx: number, cameraViewport
   return (px / viewportHeightPx) * cameraViewportHeight;
 }
 
-function getSettings(quality: QualityTier, stacked: boolean, viewportWidth: number): CountdownSettings {
+function getSettings(
+  quality: QualityTier,
+  stacked: boolean,
+  viewportWidth: number,
+  cameraZ: number,
+  cameraFov: number,
+  containerWidthPx: number,
+  containerHeightPx: number
+): CountdownSettings {
   const viewportScale = viewportWidth >= 1440 ? 1.08 : viewportWidth >= 1024 ? 1.03 : 1;
+  const measuredWidth = Math.max(1, containerWidthPx || 1280);
+  const measuredHeight = Math.max(1, containerHeightPx || 300);
+  const visibleHeight = 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360);
+  const aspect = measuredWidth / measuredHeight;
+  const visibleWidth = visibleHeight * aspect;
 
   if (quality === "high") {
     return {
       canvasWidth: stacked ? 820 : 1280,
       canvasHeight: stacked ? 920 : 320,
       fontSize: stacked ? 128 : 138,
-      sceneWidth: stacked ? 4.75 : 5.15,
-      sceneHeight: stacked ? 4.9 : 1.72,
+      sceneWidth: visibleWidth,
+      sceneHeight: visibleHeight,
       sceneOffsetY: stacked ? -0.16 : -0.04,
       pointSizeMin: 0.03 * viewportScale,
       pointSizeMax: 0.062 * viewportScale,
@@ -192,8 +215,8 @@ function getSettings(quality: QualityTier, stacked: boolean, viewportWidth: numb
       canvasWidth: stacked ? 760 : 1120,
       canvasHeight: stacked ? 860 : 280,
       fontSize: stacked ? 112 : 122,
-      sceneWidth: stacked ? 4.5 : 5.0,
-      sceneHeight: stacked ? 4.55 : 1.62,
+      sceneWidth: visibleWidth,
+      sceneHeight: visibleHeight,
       sceneOffsetY: stacked ? -0.15 : -0.035,
       pointSizeMin: 0.024 * viewportScale,
       pointSizeMax: 0.05 * viewportScale,
@@ -208,8 +231,8 @@ function getSettings(quality: QualityTier, stacked: boolean, viewportWidth: numb
     canvasWidth: stacked ? 790 : 1200,
     canvasHeight: stacked ? 900 : 300,
     fontSize: stacked ? 120 : 130,
-    sceneWidth: stacked ? 4.6 : 5.05,
-    sceneHeight: stacked ? 4.7 : 1.68,
+    sceneWidth: visibleWidth,
+    sceneHeight: visibleHeight,
     sceneOffsetY: stacked ? -0.155 : -0.038,
     pointSizeMin: 0.027 * viewportScale,
     pointSizeMax: 0.056 * viewportScale,
@@ -253,8 +276,6 @@ function drawCountdownCanvas(
   }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -371,11 +392,15 @@ function CountdownParticles({
   reducedMotion,
   quality,
   headerHeightPx,
+  containerWidthPx,
+  containerHeightPx,
   countdown,
 }: {
   reducedMotion: boolean;
   quality: QualityTier;
   headerHeightPx: number;
+  containerWidthPx: number;
+  containerHeightPx: number;
   countdown: CountdownValue;
 }) {
   const [geometry] = useState(() => new BufferGeometry());
@@ -393,8 +418,17 @@ function CountdownParticles({
     [cameraZ]
   );
   const settings = useMemo(
-    () => getSettings(quality, stacked, viewportWidth),
-    [quality, stacked, viewportWidth]
+    () =>
+      getSettings(
+        quality,
+        stacked,
+        viewportWidth,
+        cameraZ,
+        cameraFov,
+        containerWidthPx,
+        containerHeightPx
+      ),
+    [cameraFov, cameraZ, containerHeightPx, containerWidthPx, quality, stacked, viewportWidth]
   );
   const sceneOffsetY = useMemo(() => {
     const headerWorldHeight = pixelsToWorldUnits(
@@ -414,6 +448,14 @@ function CountdownParticles({
   );
   const systemRef = useRef(system);
   const pointerWorld = useRef(new Vector3(0, 0, 0));
+  const waveXFrequency = useMemo(
+    () => (Math.PI * 2 * 1.4) / Math.max(0.001, settings.sceneWidth),
+    [settings.sceneWidth]
+  );
+  const waveYFrequency = useMemo(
+    () => (Math.PI * 2 * 1.05) / Math.max(0.001, settings.sceneHeight),
+    [settings.sceneHeight]
+  );
 
   useEffect(() => {
     systemRef.current = system;
@@ -440,11 +482,19 @@ function CountdownParticles({
     if (glowMaterialRef.current) {
       glowMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
       glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
+      glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
+      glowMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
+      glowMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
     }
 
     if (coreMaterialRef.current) {
       coreMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
       coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      coreMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
+      coreMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
+      coreMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
+      coreMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
     }
 
     state.camera.position.z = MathUtils.lerp(state.camera.position.z, cameraZ, 0.06);
@@ -528,6 +578,10 @@ function CountdownParticles({
             uLayerScale: { value: 1.55 },
             uOpacity: { value: 0.3 },
             uSoftness: { value: 1 },
+            uSceneWidth: { value: settings.sceneWidth },
+            uSceneHeight: { value: settings.sceneHeight },
+            uWaveXFrequency: { value: waveXFrequency },
+            uWaveYFrequency: { value: waveYFrequency },
           }}
         />
       </points>
@@ -546,6 +600,10 @@ function CountdownParticles({
             uLayerScale: { value: 0.88 },
             uOpacity: { value: 0.96 },
             uSoftness: { value: 0 },
+            uSceneWidth: { value: settings.sceneWidth },
+            uSceneHeight: { value: settings.sceneHeight },
+            uWaveXFrequency: { value: waveXFrequency },
+            uWaveYFrequency: { value: waveYFrequency },
           }}
         />
       </points>
@@ -558,6 +616,8 @@ export function CountdownScene({
   reducedMotion,
   quality,
   headerHeightPx,
+  containerWidthPx,
+  containerHeightPx,
   countdown,
 }: CountdownSceneProps) {
   const safeCountdown = useMemo(
@@ -591,6 +651,8 @@ export function CountdownScene({
         reducedMotion={reducedMotion}
         quality={quality}
         headerHeightPx={headerHeightPx}
+        containerWidthPx={containerWidthPx}
+        containerHeightPx={containerHeightPx}
         countdown={safeCountdown}
       />
     </Canvas>

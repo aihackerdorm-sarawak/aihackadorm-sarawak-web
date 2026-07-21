@@ -233,14 +233,49 @@ function CountdownWebGLFrame({
   headerHeightPx: number;
   values: CountdownValues;
 }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [containerWidthPx, setContainerWidthPx] = useState(0);
+  const [containerHeightPx, setContainerHeightPx] = useState(0);
+
+  useEffect(() => {
+    const element = frameRef.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const update = (entry: ResizeObserverEntry) => {
+      setContainerWidthPx(entry.contentRect.width);
+      setContainerHeightPx(entry.contentRect.height);
+    };
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        update(entry);
+      }
+    });
+
+    const rect = element.getBoundingClientRect();
+    setContainerWidthPx(rect.width);
+    setContainerHeightPx(rect.height);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="relative min-h-[300px] overflow-hidden rounded-[30px] border border-white/10 bg-black/40">
+    <div
+      ref={frameRef}
+      className="relative min-h-[300px] overflow-hidden rounded-[30px] border border-white/10 bg-black/40"
+    >
       <CountdownLabels />
       <CountdownScene
         active={active}
         reducedMotion={reducedMotion}
         quality={quality}
         headerHeightPx={headerHeightPx}
+        containerWidthPx={containerWidthPx}
+        containerHeightPx={containerHeightPx}
         countdown={values}
       />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_42%)]" />
