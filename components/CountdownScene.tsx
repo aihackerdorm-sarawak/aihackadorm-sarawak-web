@@ -178,6 +178,40 @@ function pixelsToWorldUnits(px: number, viewportHeightPx: number, cameraViewport
   return (px / viewportHeightPx) * cameraViewportHeight;
 }
 
+const COUNTDOWN_FONT_FAMILY = `"Arial Black", "Segoe UI Black", system-ui, sans-serif`;
+
+function fitTextFontSize(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxHeight: number,
+  minFontSize: number,
+  maxFontSize: number
+) {
+  let low = minFontSize;
+  let high = maxFontSize;
+  let best = minFontSize;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    ctx.font = `900 ${mid}px ${COUNTDOWN_FONT_FAMILY}`;
+    const metrics = ctx.measureText(text);
+    const textHeight =
+      (metrics.actualBoundingBoxAscent || mid * 0.76) +
+      (metrics.actualBoundingBoxDescent || mid * 0.24);
+
+    if (metrics.width <= maxWidth && textHeight <= maxHeight) {
+      best = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  ctx.font = `900 ${best}px ${COUNTDOWN_FONT_FAMILY}`;
+  return best;
+}
+
 function getSettings(
   quality: QualityTier,
   stacked: boolean,
@@ -194,6 +228,7 @@ function getSettings(
   const aspect = measuredWidth / measuredHeight;
   const visibleWidth = visibleHeight * aspect;
   const layoutScale = stacked ? 1.28 : quality === "high" ? 1.34 : quality === "medium" ? 1.3 : 1.24;
+  const particleScale = quality === "high" ? 0.94 : quality === "medium" ? 0.9 : 0.86;
 
   if (quality === "high") {
     return {
@@ -203,13 +238,13 @@ function getSettings(
       layoutScale,
       sceneWidth: visibleWidth * layoutScale,
       sceneHeight: visibleHeight * layoutScale,
-      sceneOffsetY: stacked ? -0.16 : -0.04,
-      pointSizeMin: 0.03 * viewportScale * 1.08,
-      pointSizeMax: 0.062 * viewportScale * 1.08,
-      pointScale: 4.0 * viewportScale * 1.08,
+      sceneOffsetY: stacked ? -0.08 : 0.06,
+      pointSizeMin: 0.03 * viewportScale * particleScale,
+      pointSizeMax: 0.062 * viewportScale * particleScale,
+      pointScale: 4.0 * viewportScale * particleScale,
       jitter: stacked ? 0.05 : 0.07,
-      sampleStride: stacked ? 4 : 4,
-      maxParticles: stacked ? 7000 : 9000,
+      sampleStride: stacked ? 5 : 5,
+      maxParticles: stacked ? 5200 : 6400,
     };
   }
 
@@ -221,13 +256,13 @@ function getSettings(
       layoutScale,
       sceneWidth: visibleWidth * layoutScale,
       sceneHeight: visibleHeight * layoutScale,
-      sceneOffsetY: stacked ? -0.15 : -0.035,
-      pointSizeMin: 0.024 * viewportScale * 1.06,
-      pointSizeMax: 0.05 * viewportScale * 1.06,
-      pointScale: 3.1 * viewportScale * 1.06,
+      sceneOffsetY: stacked ? -0.08 : 0.04,
+      pointSizeMin: 0.024 * viewportScale * particleScale,
+      pointSizeMax: 0.05 * viewportScale * particleScale,
+      pointScale: 3.1 * viewportScale * particleScale,
       jitter: stacked ? 0.04 : 0.06,
-      sampleStride: stacked ? 5 : 5,
-      maxParticles: stacked ? 5200 : 7200,
+      sampleStride: stacked ? 6 : 6,
+      maxParticles: stacked ? 4000 : 5200,
     };
   }
 
@@ -238,13 +273,13 @@ function getSettings(
     layoutScale,
     sceneWidth: visibleWidth * layoutScale,
     sceneHeight: visibleHeight * layoutScale,
-    sceneOffsetY: stacked ? -0.155 : -0.038,
-    pointSizeMin: 0.027 * viewportScale * 1.07,
-    pointSizeMax: 0.056 * viewportScale * 1.07,
-    pointScale: 3.45 * viewportScale * 1.07,
+    sceneOffsetY: stacked ? -0.08 : 0.05,
+    pointSizeMin: 0.027 * viewportScale * particleScale,
+    pointSizeMax: 0.056 * viewportScale * particleScale,
+    pointScale: 3.45 * viewportScale * particleScale,
     jitter: stacked ? 0.045 : 0.065,
-    sampleStride: stacked ? 4 : 4,
-    maxParticles: stacked ? 6200 : 8000,
+    sampleStride: stacked ? 5 : 5,
+    maxParticles: stacked ? 4500 : 5800,
   };
 }
 
@@ -284,21 +319,57 @@ function drawCountdownCanvas(
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `900 ${settings.fontSize}px "Arial Black", "Segoe UI Black", system-ui, sans-serif`;
+  const values = [countdown.days, countdown.hours, countdown.minutes, countdown.seconds];
+  const labels = ["DAYS", "HOURS", "MINS", "SECS"];
 
   if (stacked) {
-    const rows = [countdown.days, countdown.hours, countdown.minutes, countdown.seconds];
-    const centers = [0.18, 0.41, 0.64, 0.87];
+    const rowCenters = [0.22, 0.44, 0.66, 0.88];
+    const rowHeight = canvas.height / 4;
+    const valueFont = fitTextFontSize(
+      ctx,
+      values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
+      canvas.width * 0.74,
+      rowHeight * 0.52,
+      54,
+      Math.max(92, Math.round(settings.fontSize * 1.08))
+    );
+    const labelFont = fitTextFontSize(ctx, "HOURS", canvas.width * 0.42, rowHeight * 0.12, 14, 28);
 
-    rows.forEach((row, index) => {
-      ctx.fillText(row, canvas.width / 2, canvas.height * centers[index]);
+    values.forEach((value, index) => {
+      const centerY = canvas.height * rowCenters[index];
+
+      ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(value, canvas.width / 2, centerY - rowHeight * 0.1);
+
+      ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(labels[index], canvas.width / 2, centerY + rowHeight * 0.16);
     });
   } else {
-    ctx.fillText(
-      `${countdown.days} : ${countdown.hours} : ${countdown.minutes} : ${countdown.seconds}`,
-      canvas.width / 2,
-      canvas.height / 2
+    const gap = canvas.width * 0.024;
+    const cardWidth = (canvas.width - gap * 3) / 4;
+    const cardTop = canvas.height * 0.18;
+    const cardHeight = canvas.height * 0.54;
+    const valueFont = fitTextFontSize(
+      ctx,
+      values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
+      cardWidth * 0.84,
+      cardHeight * 0.5,
+      72,
+      Math.max(118, Math.round(settings.fontSize * 1.14))
     );
+    const labelFont = fitTextFontSize(ctx, "HOURS", cardWidth * 0.52, cardHeight * 0.12, 14, 30);
+
+    values.forEach((value, index) => {
+      const centerX = cardWidth * (index + 0.5) + gap * index;
+      const valueY = cardTop + cardHeight * 0.42;
+      const labelY = cardTop + cardHeight * 0.74;
+
+      ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(value, centerX, valueY);
+
+      ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(labels[index], centerX, labelY);
+    });
   }
 
   const stride = settings.sampleStride;
