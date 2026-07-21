@@ -266,7 +266,7 @@ function CountdownWebGLFrame({
   return (
     <div
       ref={frameRef}
-      className="relative min-h-[300px] overflow-hidden rounded-[30px] border border-white/10 bg-black/40"
+      className="relative min-h-[300px] overflow-hidden rounded-[30px] bg-black/40"
     >
       <CountdownLabels />
       <CountdownScene

@@ -227,8 +227,8 @@ function getSettings(
   const visibleHeight = 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360);
   const aspect = measuredWidth / measuredHeight;
   const visibleWidth = visibleHeight * aspect;
-  const layoutScale = stacked ? 1.28 : quality === "high" ? 1.34 : quality === "medium" ? 1.3 : 1.24;
-  const particleScale = quality === "high" ? 0.94 : quality === "medium" ? 0.9 : 0.86;
+  const layoutScale = stacked ? 1.34 : quality === "high" ? 1.42 : quality === "medium" ? 1.36 : 1.28;
+  const particleScale = quality === "high" ? 0.98 : quality === "medium" ? 0.94 : 0.9;
 
   if (quality === "high") {
     return {
@@ -238,13 +238,13 @@ function getSettings(
       layoutScale,
       sceneWidth: visibleWidth * layoutScale,
       sceneHeight: visibleHeight * layoutScale,
-      sceneOffsetY: stacked ? -0.08 : 0.06,
+      sceneOffsetY: stacked ? -0.14 : -0.02,
       pointSizeMin: 0.03 * viewportScale * particleScale,
       pointSizeMax: 0.062 * viewportScale * particleScale,
       pointScale: 4.0 * viewportScale * particleScale,
       jitter: stacked ? 0.05 : 0.07,
-      sampleStride: stacked ? 5 : 5,
-      maxParticles: stacked ? 5200 : 6400,
+      sampleStride: stacked ? 4 : 4,
+      maxParticles: stacked ? 7200 : 9800,
     };
   }
 
@@ -256,13 +256,13 @@ function getSettings(
       layoutScale,
       sceneWidth: visibleWidth * layoutScale,
       sceneHeight: visibleHeight * layoutScale,
-      sceneOffsetY: stacked ? -0.08 : 0.04,
+      sceneOffsetY: stacked ? -0.13 : -0.03,
       pointSizeMin: 0.024 * viewportScale * particleScale,
       pointSizeMax: 0.05 * viewportScale * particleScale,
       pointScale: 3.1 * viewportScale * particleScale,
       jitter: stacked ? 0.04 : 0.06,
-      sampleStride: stacked ? 6 : 6,
-      maxParticles: stacked ? 4000 : 5200,
+      sampleStride: stacked ? 5 : 5,
+      maxParticles: stacked ? 5400 : 7200,
     };
   }
 
@@ -273,13 +273,13 @@ function getSettings(
     layoutScale,
     sceneWidth: visibleWidth * layoutScale,
     sceneHeight: visibleHeight * layoutScale,
-    sceneOffsetY: stacked ? -0.08 : 0.05,
+    sceneOffsetY: stacked ? -0.12 : -0.02,
     pointSizeMin: 0.027 * viewportScale * particleScale,
     pointSizeMax: 0.056 * viewportScale * particleScale,
     pointScale: 3.45 * viewportScale * particleScale,
     jitter: stacked ? 0.045 : 0.065,
-    sampleStride: stacked ? 5 : 5,
-    maxParticles: stacked ? 4500 : 5800,
+    sampleStride: stacked ? 4 : 4,
+    maxParticles: stacked ? 6200 : 8600,
   };
 }
 
@@ -323,46 +323,46 @@ function drawCountdownCanvas(
   const labels = ["DAYS", "HOURS", "MINS", "SECS"];
 
   if (stacked) {
-    const rowCenters = [0.22, 0.44, 0.66, 0.88];
+    const rowCenters = [0.2, 0.43, 0.66, 0.89];
     const rowHeight = canvas.height / 4;
     const valueFont = fitTextFontSize(
       ctx,
       values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
-      canvas.width * 0.74,
-      rowHeight * 0.52,
-      54,
-      Math.max(92, Math.round(settings.fontSize * 1.08))
+      canvas.width * 0.8,
+      rowHeight * 0.56,
+      64,
+      Math.max(110, Math.round(settings.fontSize * 1.16))
     );
-    const labelFont = fitTextFontSize(ctx, "HOURS", canvas.width * 0.42, rowHeight * 0.12, 14, 28);
+    const labelFont = fitTextFontSize(ctx, "HOURS", canvas.width * 0.52, rowHeight * 0.18, 18, 38);
 
     values.forEach((value, index) => {
       const centerY = canvas.height * rowCenters[index];
 
       ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(value, canvas.width / 2, centerY - rowHeight * 0.1);
+      ctx.fillText(value, canvas.width / 2, centerY - rowHeight * 0.08);
 
       ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(labels[index], canvas.width / 2, centerY + rowHeight * 0.16);
+      ctx.fillText(labels[index], canvas.width / 2, centerY + rowHeight * 0.18);
     });
   } else {
-    const gap = canvas.width * 0.024;
+    const gap = canvas.width * 0.016;
     const cardWidth = (canvas.width - gap * 3) / 4;
-    const cardTop = canvas.height * 0.18;
-    const cardHeight = canvas.height * 0.54;
+    const cardTop = canvas.height * 0.11;
+    const cardHeight = canvas.height * 0.68;
     const valueFont = fitTextFontSize(
       ctx,
       values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
-      cardWidth * 0.84,
-      cardHeight * 0.5,
-      72,
-      Math.max(118, Math.round(settings.fontSize * 1.14))
+      cardWidth * 0.88,
+      cardHeight * 0.54,
+      82,
+      Math.max(132, Math.round(settings.fontSize * 1.2))
     );
-    const labelFont = fitTextFontSize(ctx, "HOURS", cardWidth * 0.52, cardHeight * 0.12, 14, 30);
+    const labelFont = fitTextFontSize(ctx, "HOURS", cardWidth * 0.58, cardHeight * 0.18, 18, 40);
 
     values.forEach((value, index) => {
       const centerX = cardWidth * (index + 0.5) + gap * index;
-      const valueY = cardTop + cardHeight * 0.42;
-      const labelY = cardTop + cardHeight * 0.74;
+      const valueY = cardTop + cardHeight * 0.4;
+      const labelY = cardTop + cardHeight * 0.72;
 
       ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
       ctx.fillText(value, centerX, valueY);
