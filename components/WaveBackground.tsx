@@ -30,19 +30,22 @@ interface Ripple {
   life: number;
   maxRadius: number;
   forceMul: number;
+  speed: number;
+  ambient?: boolean;
 }
 
-const AMBIENT_MAX_RADIUS = 320;
-const AMBIENT_FORCE = 9;
-const AMBIENT_INTERVAL_MIN = 3000;
-const AMBIENT_INTERVAL_MAX = 7000;
+const AMBIENT_MAX_RADIUS = 560;
+const AMBIENT_FORCE = 3.5;
+const AMBIENT_SPEED = 70;
+const AMBIENT_INTERVAL_MIN = 900;
+const AMBIENT_INTERVAL_MAX = 1100;
 
 export type AmbientRippleConfig = {
   maxRadius?: number;
   force?: number;
+  speed?: number;
   intervalMin?: number;
   intervalMax?: number;
-  countPerBurst?: number;
 };
 
 function toCanvasCoords(clientX: number, clientY: number, canvas: HTMLCanvasElement) {
@@ -79,13 +82,26 @@ export default function WaveBackground({
     let mouseY = -10000;
     let mouseOnPage = false;
     let animId = 0;
+    let canvasWidth = window.innerWidth;
+    let canvasHeight = window.innerHeight;
+
+    const getContainerSize = () => {
+      const parent = canvas.parentElement;
+      if (parent) {
+        const rect = parent.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return { width: rect.width, height: rect.height };
+        }
+      }
+      return { width: window.innerWidth, height: window.innerHeight };
+    };
 
     const initDots = () => {
       dots = [];
-      const cols = Math.floor(window.innerWidth / DOT_SPACING);
-      const rows = Math.floor(window.innerHeight / DOT_SPACING);
-      const offsetX = (window.innerWidth - cols * DOT_SPACING) / 2 + DOT_SPACING / 2;
-      const offsetY = (window.innerHeight - rows * DOT_SPACING) / 2 + DOT_SPACING / 2;
+      const cols = Math.floor(canvasWidth / DOT_SPACING);
+      const rows = Math.floor(canvasHeight / DOT_SPACING);
+      const offsetX = (canvasWidth - cols * DOT_SPACING) / 2 + DOT_SPACING / 2;
+      const offsetY = (canvasHeight - rows * DOT_SPACING) / 2 + DOT_SPACING / 2;
 
       for (let c = 0; c < cols; c += 1) {
         for (let r = 0; r < rows; r += 1) {
@@ -97,10 +113,13 @@ export default function WaveBackground({
     };
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      const size = getContainerSize();
+      canvasWidth = size.width;
+      canvasHeight = size.height;
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      canvas.style.width = `${canvasWidth}px`;
+      canvas.style.height = `${canvasHeight}px`;
       initDots();
     };
 
@@ -113,14 +132,15 @@ export default function WaveBackground({
         life: 1,
         maxRadius,
         forceMul,
+        speed: WAVE_SPEED,
       });
     };
 
     const maxRadius = ambient.maxRadius ?? AMBIENT_MAX_RADIUS;
     const forceVal = ambient.force ?? AMBIENT_FORCE;
+    const ambientSpeed = ambient.speed ?? AMBIENT_SPEED;
     const intervalMin = ambient.intervalMin ?? AMBIENT_INTERVAL_MIN;
     const intervalMax = ambient.intervalMax ?? AMBIENT_INTERVAL_MAX;
-    const countPerBurst = ambient.countPerBurst ?? 2;
 
     const spawnAmbientRipple = () => {
       ripples.push({
@@ -130,6 +150,8 @@ export default function WaveBackground({
         life: 1,
         maxRadius: maxRadius + Math.random() * (maxRadius * 0.25),
         forceMul: forceVal / WAVE_FORCE,
+        speed: ambientSpeed,
+        ambient: true,
       });
     };
 
@@ -218,7 +240,7 @@ export default function WaveBackground({
 
       for (let r = ripples.length - 1; r >= 0; r -= 1) {
         const ripple = ripples[r];
-        ripple.radius += (WAVE_SPEED * clampedDt) / 1000;
+        ripple.radius += (ripple.speed * clampedDt) / 1000;
         ripple.life = Math.max(0, 1 - ripple.radius / ripple.maxRadius);
         if (ripple.radius > ripple.maxRadius) {
           ripples.splice(r, 1);
@@ -227,9 +249,9 @@ export default function WaveBackground({
     };
 
     const draw = () => {
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
       ctx.fillStyle = "#030303";
-      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
@@ -291,21 +313,22 @@ export default function WaveBackground({
     const scheduleAmbient = () => {
       const delay = intervalMin + Math.random() * (intervalMax - intervalMin);
       ambientTimer = window.setTimeout(() => {
-        const burst = countPerBurst + Math.floor(Math.random() * (countPerBurst + 1));
-        for (let i = 0; i < burst; i += 1) {
-          spawnAmbientRipple();
-        }
+        spawnAmbientRipple();
         scheduleAmbient();
       }, delay);
     };
 
     scheduleAmbient();
-    for (let i = 0; i < countPerBurst; i += 1) {
-      spawnAmbientRipple();
-    }
+    spawnAmbientRipple();
 
     resize();
     animId = requestAnimationFrame(loop);
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" && canvas.parentElement
+        ? new ResizeObserver(() => resize())
+        : null;
+    resizeObserver?.observe(canvas.parentElement as Element);
 
     window.addEventListener("resize", resize);
     window.addEventListener(WAVE_EVENT, handleCustomRipple);
@@ -317,6 +340,7 @@ export default function WaveBackground({
     return () => {
       cancelAnimationFrame(animId);
       window.clearTimeout(ambientTimer);
+      resizeObserver?.disconnect();
       window.removeEventListener("resize", resize);
       window.removeEventListener(WAVE_EVENT, handleCustomRipple);
       document.removeEventListener("mousemove", handleMouseMove);
@@ -324,12 +348,12 @@ export default function WaveBackground({
       document.removeEventListener("mouseleave", handleMouseLeave);
       document.removeEventListener("click", handleDocumentClick);
     };
-  }, [active, ambient.maxRadius, ambient.force, ambient.intervalMin, ambient.intervalMax, ambient.countPerBurst, dotColor]);
+  }, [active, ambient.maxRadius, ambient.force, ambient.speed, ambient.intervalMin, ambient.intervalMax, dotColor]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none fixed inset-0"
+      className="pointer-events-none absolute inset-0 h-full w-full"
       style={{ zIndex: 0 }}
       aria-hidden="true"
     />
