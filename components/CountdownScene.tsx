@@ -42,6 +42,7 @@ type CountdownSettings = {
   canvasWidth: number;
   canvasHeight: number;
   fontSize: number;
+  layoutScale: number;
   sceneWidth: number;
   sceneHeight: number;
   sceneOffsetY: number;
@@ -192,18 +193,20 @@ function getSettings(
   const visibleHeight = 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360);
   const aspect = measuredWidth / measuredHeight;
   const visibleWidth = visibleHeight * aspect;
+  const layoutScale = stacked ? 1.28 : quality === "high" ? 1.34 : quality === "medium" ? 1.3 : 1.24;
 
   if (quality === "high") {
     return {
-      canvasWidth: stacked ? 820 : 1280,
-      canvasHeight: stacked ? 920 : 320,
+      canvasWidth: 1500,
+      canvasHeight: 380,
       fontSize: stacked ? 128 : 138,
-      sceneWidth: visibleWidth,
-      sceneHeight: visibleHeight,
+      layoutScale,
+      sceneWidth: visibleWidth * layoutScale,
+      sceneHeight: visibleHeight * layoutScale,
       sceneOffsetY: stacked ? -0.16 : -0.04,
-      pointSizeMin: 0.03 * viewportScale,
-      pointSizeMax: 0.062 * viewportScale,
-      pointScale: 4.0 * viewportScale,
+      pointSizeMin: 0.03 * viewportScale * 1.08,
+      pointSizeMax: 0.062 * viewportScale * 1.08,
+      pointScale: 4.0 * viewportScale * 1.08,
       jitter: stacked ? 0.05 : 0.07,
       sampleStride: stacked ? 4 : 4,
       maxParticles: stacked ? 7000 : 9000,
@@ -215,12 +218,13 @@ function getSettings(
       canvasWidth: stacked ? 760 : 1120,
       canvasHeight: stacked ? 860 : 280,
       fontSize: stacked ? 112 : 122,
-      sceneWidth: visibleWidth,
-      sceneHeight: visibleHeight,
+      layoutScale,
+      sceneWidth: visibleWidth * layoutScale,
+      sceneHeight: visibleHeight * layoutScale,
       sceneOffsetY: stacked ? -0.15 : -0.035,
-      pointSizeMin: 0.024 * viewportScale,
-      pointSizeMax: 0.05 * viewportScale,
-      pointScale: 3.1 * viewportScale,
+      pointSizeMin: 0.024 * viewportScale * 1.06,
+      pointSizeMax: 0.05 * viewportScale * 1.06,
+      pointScale: 3.1 * viewportScale * 1.06,
       jitter: stacked ? 0.04 : 0.06,
       sampleStride: stacked ? 5 : 5,
       maxParticles: stacked ? 5200 : 7200,
@@ -231,12 +235,13 @@ function getSettings(
     canvasWidth: stacked ? 790 : 1200,
     canvasHeight: stacked ? 900 : 300,
     fontSize: stacked ? 120 : 130,
-    sceneWidth: visibleWidth,
-    sceneHeight: visibleHeight,
+    layoutScale,
+    sceneWidth: visibleWidth * layoutScale,
+    sceneHeight: visibleHeight * layoutScale,
     sceneOffsetY: stacked ? -0.155 : -0.038,
-    pointSizeMin: 0.027 * viewportScale,
-    pointSizeMax: 0.056 * viewportScale,
-    pointScale: 3.45 * viewportScale,
+    pointSizeMin: 0.027 * viewportScale * 1.07,
+    pointSizeMax: 0.056 * viewportScale * 1.07,
+    pointScale: 3.45 * viewportScale * 1.07,
     jitter: stacked ? 0.045 : 0.065,
     sampleStride: stacked ? 4 : 4,
     maxParticles: stacked ? 6200 : 8000,
