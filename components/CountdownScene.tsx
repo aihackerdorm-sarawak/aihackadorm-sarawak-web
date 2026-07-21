@@ -448,6 +448,11 @@ function CountdownParticles({
   );
   const systemRef = useRef(system);
   const pointerWorld = useRef(new Vector3(0, 0, 0));
+  const pointerDebugCount = useRef(0);
+  const hitPlaneScale = useMemo(
+    () => [settings.sceneWidth, settings.sceneHeight, 1] as const,
+    [settings.sceneHeight, settings.sceneWidth]
+  );
   const waveXFrequency = useMemo(
     () => (Math.PI * 2 * 1.4) / Math.max(0.001, settings.sceneWidth),
     [settings.sceneWidth]
@@ -545,6 +550,15 @@ function CountdownParticles({
   const handlePointerMove = (event: ThreeEvent<PointerEvent>) => {
     pointerWorld.current.copy(event.point);
     pointerActive.current = true;
+
+    if (pointerDebugCount.current < 8) {
+      pointerDebugCount.current += 1;
+      console.debug("[countdown pointer]", {
+        point: event.point.toArray(),
+        container: [containerWidthPx, containerHeightPx],
+        scene: [settings.sceneWidth, settings.sceneHeight],
+      });
+    }
   };
 
   const handlePointerLeave = () => {
@@ -555,8 +569,8 @@ function CountdownParticles({
   return (
     <group>
       <mesh
-        position={[0, 0, -0.45]}
-        scale={[8.2, 5.8, 1]}
+        position={[0, 0, 0]}
+        scale={hitPlaneScale}
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerLeave}
       >
