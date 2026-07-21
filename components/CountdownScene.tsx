@@ -1,77 +1,66 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MutableRefObject, PointerEvent as ReactPointerEvent } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
 import { Canvas, useFrame } from "@react-three/fiber";
-import {
-  AdaptiveDpr,
-  AdaptiveEvents,
-  PerformanceMonitor,
-} from "@react-three/drei";
-import { Bloom, EffectComposer } from "@react-three/postprocessing";
-import type { BufferGeometry, Points as ThreePoints, ShaderMaterial } from "three";
+import { AdaptiveDpr, AdaptiveEvents } from "@react-three/drei";
 import {
   AdditiveBlending,
   BufferAttribute,
-  Plane,
-  Vector2,
+  BufferGeometry,
+  MathUtils,
   Vector3,
 } from "three";
+import type { ShaderMaterial } from "three";
 
 type QualityTier = "low" | "medium" | "high";
 
-type CountdownSceneProps = {
-  active: boolean;
-  reducedMotion: boolean;
-  quality: QualityTier;
-  headerHeightPx: number;
-};
-
-type CountdownValue = {
+export type CountdownValue = {
   days: string;
   hours: string;
   minutes: string;
   seconds: string;
 };
 
-type GlyphPoint = [number, number];
+type CountdownSceneProps = {
+  active: boolean;
+  reducedMotion: boolean;
+  quality: QualityTier;
+  headerHeightPx: number;
+  containerWidthPx: number;
+  containerHeightPx: number;
+  countdown?: CountdownValue;
+};
+
+type SamplePoint = {
+  x: number;
+  y: number;
+  alpha: number;
+};
 
 type CountdownSettings = {
-  resolution: number;
-  particlesPerGlyph: number;
-  glyphWidth: number;
-  glyphHeight: number;
-  glyphWidthScale: number;
-  digitStep: number;
-  groupSpacingX: number;
-  groupSpacingY: number;
-  separatorGapX: number;
-  separatorGapY: number;
-  separatorWidth: number;
-  separatorHeight: number;
+  canvasWidth: number;
+  canvasHeight: number;
+  fontSize: number;
+  layoutScale: number;
+  sceneWidth: number;
+  sceneHeight: number;
+  sceneOffsetY: number;
   pointSizeMin: number;
   pointSizeMax: number;
-  pointSizeScale: number;
+  pointScale: number;
+  jitter: number;
+  sampleStride: number;
+  maxParticles: number;
 };
 
 type ParticleSystem = {
   positions: Float32Array;
-  targets: Float32Array;
+  basePositions: Float32Array;
   colors: Float32Array;
   sizes: Float32Array;
   count: number;
 };
-
-type LayoutItem = {
-  char: string;
-  originX: number;
-  originY: number;
-  scaleX: number;
-  scaleY: number;
-  sampleCount: number;
-};
-
-const EVENT_START = new Date("2026-10-14T09:00:00");
 
 const vertexShader = `
 attribute float aSize;
@@ -81,17 +70,28 @@ varying vec3 vColor;
 
 uniform float uTime;
 uniform float uPointScale;
+uniform float uLayerScale;
+uniform float uSceneWidth;
+uniform float uSceneHeight;
+uniform float uWaveXFrequency;
+uniform float uWaveYFrequency;
 
 void main() {
   vColor = aColor;
 
   vec3 displaced = position;
-  displaced.z += sin(uTime * 1.15 + position.x * 0.85 + position.y * 1.1) * 0.022;
+  float normalizedX = position.x / max(0.001, uSceneWidth);
+  float normalizedY = position.y / max(0.001, uSceneHeight);
+  float waveX = normalizedX * uWaveXFrequency;
+  float waveY = normalizedY * uWaveYFrequency;
+  displaced.z += sin(uTime * 0.7 + waveX + waveY) * 0.012;
+  displaced.x += sin(uTime * 0.28 + waveY) * 0.0028;
+  displaced.y += cos(uTime * 0.24 + waveX) * 0.0022;
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
-  float perspective = 240.0 / max(0.001, -mvPosition.z);
+  float perspective = 245.0 / max(0.001, -mvPosition.z);
 
-  gl_PointSize = aSize * uPointScale * perspective;
+  gl_PointSize = aSize * uPointScale * uLayerScale * perspective;
   gl_Position = projectionMatrix * mvPosition;
 }
 `;
@@ -99,223 +99,25 @@ void main() {
 const fragmentShader = `
 varying vec3 vColor;
 
+uniform float uOpacity;
+uniform float uSoftness;
+
 void main() {
   vec2 uv = gl_PointCoord - vec2(0.5);
   float dist = length(uv);
-  float core = 1.0 - smoothstep(0.0, 0.48, dist);
-  float glow = 1.0 - smoothstep(0.18, 0.5, dist);
-  float alpha = core * 0.72 + glow * 0.28;
+  float glow = 1.0 - smoothstep(0.14, 0.5, dist);
+  float core = 1.0 - smoothstep(0.0, 0.42, dist);
+  float alpha = mix(core, core * 0.65 + glow * 0.35, uSoftness);
 
-  gl_FragColor = vec4(vColor, alpha);
+  gl_FragColor = vec4(vColor, alpha * uOpacity);
 }
 `;
 
-function useCountdown(target: Date) {
-  const [remaining, setRemaining] = useState(() =>
-    Math.max(0, target.getTime() - Date.now())
-  );
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setRemaining(Math.max(0, target.getTime() - Date.now()));
-    }, 1000);
-
-    return () => window.clearInterval(id);
-  }, [target]);
-
-  const totalSeconds = Math.floor(remaining / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  return {
-    days: String(days).padStart(2, "0"),
-    hours: String(hours).padStart(2, "0"),
-    minutes: String(minutes).padStart(2, "0"),
-    seconds: String(seconds).padStart(2, "0"),
-  };
-}
-
-function scaleWithViewport(value: number, viewportScale: number, influence: number) {
-  return value * (1 + (viewportScale - 1) * influence);
-}
-
-function getSettings(quality: QualityTier, viewportScale = 1): CountdownSettings {
-  if (quality === "high") {
-    return {
-      resolution: Math.round(scaleWithViewport(80, viewportScale, 0.35)),
-      particlesPerGlyph: Math.round(scaleWithViewport(224, viewportScale, 0.08)),
-      glyphWidth: scaleWithViewport(0.52, viewportScale, 0.1),
-      glyphHeight: scaleWithViewport(0.92, viewportScale, 0.08),
-      glyphWidthScale: scaleWithViewport(1.38, viewportScale, 0.16),
-      digitStep: scaleWithViewport(0.58, viewportScale, 0.9),
-      groupSpacingX: scaleWithViewport(1.86, viewportScale, 0.92),
-      groupSpacingY: scaleWithViewport(1.08, viewportScale, 0.18),
-      separatorGapX: scaleWithViewport(0.82, viewportScale, 0.92),
-      separatorGapY: scaleWithViewport(0.78, viewportScale, 0.18),
-      separatorWidth: scaleWithViewport(0.16, viewportScale, 0.08),
-      separatorHeight: scaleWithViewport(0.48, viewportScale, 0.08),
-      pointSizeMin: scaleWithViewport(0.048, viewportScale, 0.1),
-      pointSizeMax: scaleWithViewport(0.092, viewportScale, 0.1),
-      pointSizeScale: scaleWithViewport(4.35, viewportScale, 0.18),
-    };
-  }
-
-  if (quality === "low") {
-    return {
-      resolution: Math.round(scaleWithViewport(44, viewportScale, 0.3)),
-      particlesPerGlyph: Math.round(scaleWithViewport(128, viewportScale, 0.06)),
-      glyphWidth: scaleWithViewport(0.48, viewportScale, 0.09),
-      glyphHeight: scaleWithViewport(0.88, viewportScale, 0.07),
-      glyphWidthScale: scaleWithViewport(1.32, viewportScale, 0.14),
-      digitStep: scaleWithViewport(0.54, viewportScale, 0.82),
-      groupSpacingX: scaleWithViewport(1.74, viewportScale, 0.88),
-      groupSpacingY: scaleWithViewport(1.0, viewportScale, 0.16),
-      separatorGapX: scaleWithViewport(0.78, viewportScale, 0.88),
-      separatorGapY: scaleWithViewport(0.72, viewportScale, 0.16),
-      separatorWidth: scaleWithViewport(0.14, viewportScale, 0.06),
-      separatorHeight: scaleWithViewport(0.42, viewportScale, 0.06),
-      pointSizeMin: scaleWithViewport(0.044, viewportScale, 0.08),
-      pointSizeMax: scaleWithViewport(0.084, viewportScale, 0.08),
-      pointSizeScale: scaleWithViewport(3.85, viewportScale, 0.14),
-    };
-  }
-
-  return {
-    resolution: Math.round(scaleWithViewport(64, viewportScale, 0.32)),
-    particlesPerGlyph: Math.round(scaleWithViewport(176, viewportScale, 0.07)),
-    glyphWidth: scaleWithViewport(0.5, viewportScale, 0.09),
-    glyphHeight: scaleWithViewport(0.9, viewportScale, 0.07),
-    glyphWidthScale: scaleWithViewport(1.34, viewportScale, 0.14),
-    digitStep: scaleWithViewport(0.56, viewportScale, 0.84),
-    groupSpacingX: scaleWithViewport(1.82, viewportScale, 0.9),
-    groupSpacingY: scaleWithViewport(1.04, viewportScale, 0.16),
-    separatorGapX: scaleWithViewport(0.8, viewportScale, 0.9),
-    separatorGapY: scaleWithViewport(0.74, viewportScale, 0.16),
-    separatorWidth: scaleWithViewport(0.15, viewportScale, 0.06),
-    separatorHeight: scaleWithViewport(0.46, viewportScale, 0.06),
-    pointSizeMin: scaleWithViewport(0.046, viewportScale, 0.08),
-    pointSizeMax: scaleWithViewport(0.088, viewportScale, 0.08),
-    pointSizeScale: scaleWithViewport(4.1, viewportScale, 0.16),
-  };
-}
+const PALETTE = ["#ffffff", "#f0f0f0", "#cacaca"] as const;
 
 function hash01(seed: number) {
   const value = Math.sin(seed * 12.9898) * 43758.5453;
   return value - Math.floor(value);
-}
-
-function hexToRgb(hex: string) {
-  const normalized = hex.replace("#", "");
-  const value = Number.parseInt(normalized, 16);
-  return {
-    r: (value >> 16) & 255,
-    g: (value >> 8) & 255,
-    b: value & 255,
-  };
-}
-
-function mixRgb(a: ReturnType<typeof hexToRgb>, b: ReturnType<typeof hexToRgb>, t: number) {
-  return {
-    r: Math.round(a.r + (b.r - a.r) * t),
-    g: Math.round(a.g + (b.g - a.g) * t),
-    b: Math.round(a.b + (b.b - a.b) * t),
-  };
-}
-
-const COLOR_STOPS = [
-  "#eafcff",
-  "#8ff0ff",
-  "#00f0ff",
-] as const;
-
-const COLOR_STOPS_RGB = COLOR_STOPS.map(hexToRgb);
-
-function getParticleColor(toneRoll: number, pointMix: number, isBright: boolean) {
-  if (toneRoll < 0.5) {
-    return COLOR_STOPS_RGB[0];
-  }
-
-  if (toneRoll < 0.85) {
-    return isBright
-      ? mixRgb(COLOR_STOPS_RGB[0], COLOR_STOPS_RGB[1], 0.42 + pointMix * 0.18)
-      : mixRgb(COLOR_STOPS_RGB[0], COLOR_STOPS_RGB[1], 0.22 + pointMix * 0.2);
-  }
-
-  return isBright
-    ? mixRgb(COLOR_STOPS_RGB[1], COLOR_STOPS_RGB[2], 0.18 + pointMix * 0.18)
-    : mixRgb(COLOR_STOPS_RGB[1], COLOR_STOPS_RGB[2], 0.08 + pointMix * 0.14);
-}
-
-function sampleGlyphPositions(char: string, resolution: number, sampleCount: number, widthScale: number) {
-  const canvas = document.createElement("canvas");
-  canvas.width = resolution;
-  canvas.height = resolution;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return Array.from({ length: sampleCount }, () => [0, 0] as GlyphPoint);
-  }
-
-  ctx.clearRect(0, 0, resolution, resolution);
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, resolution, resolution);
-  ctx.fillStyle = "#fff";
-  ctx.font = `900 ${Math.round(resolution * 0.86)}px "Arial Black", "Segoe UI Black", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.save();
-  ctx.translate(resolution / 2, resolution / 2);
-  ctx.scale(widthScale, 1);
-  ctx.translate(-resolution / 2, -resolution / 2);
-  ctx.fillText(char, resolution / 2, resolution / 2);
-  ctx.restore();
-
-  const { data } = ctx.getImageData(0, 0, resolution, resolution);
-  const rawPoints: GlyphPoint[] = [];
-
-  for (let y = 0; y < resolution; y += 1) {
-    for (let x = 0; x < resolution; x += 1) {
-      const index = (y * resolution + x) * 4;
-      const alpha = data[index + 3];
-      const brightness = data[index] + data[index + 1] + data[index + 2];
-      if (alpha > 200 && brightness > 620) {
-        rawPoints.push([(x / resolution) * 2 - 1, -((y / resolution) * 2 - 1)]);
-      }
-    }
-  }
-
-  if (rawPoints.length === 0) {
-    return Array.from({ length: sampleCount }, () => [0, 0] as GlyphPoint);
-  }
-
-  const sampled: GlyphPoint[] = [];
-  const step = rawPoints.length / sampleCount;
-
-  for (let index = 0; index < sampleCount; index += 1) {
-    const source = rawPoints[Math.floor(index * step) % rawPoints.length] ?? rawPoints[0];
-    sampled.push(source);
-  }
-
-  return sampled;
-}
-
-function buildGlyphCache(settings: CountdownSettings) {
-  const cache: Record<string, GlyphPoint[]> = {};
-  const characters = "0123456789:";
-
-  for (const char of characters) {
-    cache[char] = sampleGlyphPositions(
-      char,
-      settings.resolution,
-      settings.particlesPerGlyph,
-      settings.glyphWidthScale
-    );
-  }
-
-  return cache;
 }
 
 function useViewportWidth() {
@@ -335,7 +137,7 @@ function useViewportWidth() {
 
 function useViewportHeight() {
   const [height, setHeight] = useState(() =>
-    typeof window === "undefined" ? 768 : window.innerHeight
+    typeof window === "undefined" ? 800 : window.innerHeight
   );
 
   useEffect(() => {
@@ -348,31 +150,24 @@ function useViewportHeight() {
   return height;
 }
 
-function useLayoutMode() {
-  const [isStacked, setIsStacked] = useState(false);
+function useStackedLayout() {
+  const [stacked, setStacked] = useState(false);
 
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 640px)");
-    const update = () => setIsStacked(query.matches);
-    const legacyQuery = query as MediaQueryList & {
-      addEventListener?: (type: "change", listener: () => void) => void;
-      removeEventListener?: (type: "change", listener: () => void) => void;
-      addListener?: (listener: () => void) => void;
-      removeListener?: (listener: () => void) => void;
-    };
-
+    const query = window.matchMedia("(max-width: 768px)");
+    const update = () => setStacked(query.matches);
     update();
 
-    if (legacyQuery.addEventListener) {
-      legacyQuery.addEventListener("change", update);
-      return () => legacyQuery.removeEventListener?.("change", update);
+    if (query.addEventListener) {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
     }
 
-    legacyQuery.addListener?.(update);
-    return () => legacyQuery.removeListener?.(update);
+    query.addListener(update);
+    return () => query.removeListener(update);
   }, []);
 
-  return isStacked;
+  return stacked;
 }
 
 function pixelsToWorldUnits(px: number, viewportHeightPx: number, cameraViewportHeight: number) {
@@ -383,185 +178,286 @@ function pixelsToWorldUnits(px: number, viewportHeightPx: number, cameraViewport
   return (px / viewportHeightPx) * cameraViewportHeight;
 }
 
-function computeLayout(
-  countdown: CountdownValue,
-  settings: CountdownSettings,
-  isStacked: boolean,
-  sceneOffsetY: number
+const COUNTDOWN_FONT_FAMILY = `"Arial Black", "Segoe UI Black", system-ui, sans-serif`;
+
+function fitTextFontSize(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxHeight: number,
+  minFontSize: number,
+  maxFontSize: number
 ) {
-  const groups = [
-    countdown.days,
-    countdown.hours,
-    countdown.minutes,
-    countdown.seconds,
-  ].map((value) => value.slice(-2).padStart(2, "0"));
-  const digitSpacing = settings.digitStep * settings.glyphWidthScale * 1.08;
-  const stackOffsetY = (isStacked ? -1.18 : -0.62) + sceneOffsetY;
+  let low = minFontSize;
+  let high = maxFontSize;
+  let best = minFontSize;
 
-  const groupOrigins = isStacked
-    ? [1.5, 0.5, -0.5, -1.5].map((y) => ({ x: 0, y: y * settings.groupSpacingY + stackOffsetY }))
-    : [-1.5, -0.5, 0.5, 1.5].map((x) => ({ x: x * settings.groupSpacingX, y: stackOffsetY }));
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    ctx.font = `900 ${mid}px ${COUNTDOWN_FONT_FAMILY}`;
+    const metrics = ctx.measureText(text);
+    const textHeight =
+      (metrics.actualBoundingBoxAscent || mid * 0.76) +
+      (metrics.actualBoundingBoxDescent || mid * 0.24);
 
-  const items: LayoutItem[] = [];
+    if (metrics.width <= maxWidth && textHeight <= maxHeight) {
+      best = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
 
-  groups.forEach((group, groupIndex) => {
-    const origin = groupOrigins[groupIndex];
-    const digits = group.split("");
+  ctx.font = `900 ${best}px ${COUNTDOWN_FONT_FAMILY}`;
+  return best;
+}
 
-    digits.forEach((digit, digitIndex) => {
-      items.push({
-        char: digit,
-        originX: origin.x + (digitIndex === 0 ? -digitSpacing / 2 : digitSpacing / 2),
-        originY: origin.y,
-        scaleX: settings.glyphWidth,
-        scaleY: settings.glyphHeight,
-        sampleCount: settings.particlesPerGlyph,
-      });
+function getSettings(
+  quality: QualityTier,
+  stacked: boolean,
+  viewportWidth: number,
+  cameraZ: number,
+  cameraFov: number,
+  containerWidthPx: number,
+  containerHeightPx: number
+): CountdownSettings {
+  const viewportScale = viewportWidth >= 1440 ? 1.08 : viewportWidth >= 1024 ? 1.03 : 1;
+  const measuredWidth = Math.max(1, containerWidthPx || 1280);
+  const measuredHeight = Math.max(1, containerHeightPx || 300);
+  const visibleHeight = 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360);
+  const aspect = measuredWidth / measuredHeight;
+  const visibleWidth = visibleHeight * aspect;
+  const layoutScale = stacked ? 1.42 : quality === "high" ? 1.56 : quality === "medium" ? 1.48 : 1.36;
+  const particleScale = quality === "high" ? 1.02 : quality === "medium" ? 0.98 : 0.94;
+
+  if (quality === "high") {
+    return {
+      canvasWidth: 1500,
+      canvasHeight: 380,
+      fontSize: stacked ? 128 : 138,
+      layoutScale,
+      sceneWidth: visibleWidth * layoutScale,
+      sceneHeight: visibleHeight * layoutScale,
+      sceneOffsetY: stacked ? -0.18 : -0.06,
+      pointSizeMin: 0.03 * viewportScale * particleScale,
+      pointSizeMax: 0.062 * viewportScale * particleScale,
+      pointScale: 4.0 * viewportScale * particleScale,
+      jitter: stacked ? 0.05 : 0.07,
+      sampleStride: stacked ? 4 : 4,
+      maxParticles: stacked ? 8200 : 11800,
+    };
+  }
+
+  if (quality === "low") {
+    return {
+      canvasWidth: stacked ? 760 : 1120,
+      canvasHeight: stacked ? 860 : 280,
+      fontSize: stacked ? 112 : 122,
+      layoutScale,
+      sceneWidth: visibleWidth * layoutScale,
+      sceneHeight: visibleHeight * layoutScale,
+      sceneOffsetY: stacked ? -0.17 : -0.06,
+      pointSizeMin: 0.024 * viewportScale * particleScale,
+      pointSizeMax: 0.05 * viewportScale * particleScale,
+      pointScale: 3.1 * viewportScale * particleScale,
+      jitter: stacked ? 0.04 : 0.06,
+      sampleStride: stacked ? 5 : 5,
+      maxParticles: stacked ? 6200 : 8600,
+    };
+  }
+
+  return {
+    canvasWidth: stacked ? 790 : 1200,
+    canvasHeight: stacked ? 900 : 300,
+    fontSize: stacked ? 120 : 130,
+    layoutScale,
+    sceneWidth: visibleWidth * layoutScale,
+    sceneHeight: visibleHeight * layoutScale,
+    sceneOffsetY: stacked ? -0.16 : -0.06,
+    pointSizeMin: 0.027 * viewportScale * particleScale,
+    pointSizeMax: 0.056 * viewportScale * particleScale,
+    pointScale: 3.45 * viewportScale * particleScale,
+    jitter: stacked ? 0.045 : 0.065,
+    sampleStride: stacked ? 4 : 4,
+    maxParticles: stacked ? 7000 : 9800,
+  };
+}
+
+function reduceSamplePoints(points: SamplePoint[], maxParticles: number) {
+  if (points.length <= maxParticles) {
+    return points;
+  }
+
+  const step = Math.max(1, Math.ceil(points.length / maxParticles));
+  const reduced: SamplePoint[] = [];
+
+  for (let index = 0; index < points.length; index += step) {
+    reduced.push(points[index]);
+    if (reduced.length >= maxParticles) {
+      break;
+    }
+  }
+
+  return reduced;
+}
+
+function drawCountdownCanvas(
+  countdown: CountdownValue,
+  stacked: boolean,
+  settings: CountdownSettings
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = settings.canvasWidth;
+  canvas.height = settings.canvasHeight;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return [] as SamplePoint[];
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const values = [countdown.days, countdown.hours, countdown.minutes, countdown.seconds];
+  const labels = ["DAYS", "HOURS", "MINS", "SECS"];
+
+  if (stacked) {
+    const rowCenters = [0.18, 0.42, 0.66, 0.9];
+    const rowHeight = canvas.height / 4;
+    const valueFont = fitTextFontSize(
+      ctx,
+      values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
+      canvas.width * 0.86,
+      rowHeight * 0.62,
+      72,
+      Math.max(122, Math.round(settings.fontSize * 1.24))
+    );
+    const labelFont = fitTextFontSize(ctx, "HOURS", canvas.width * 0.6, rowHeight * 0.22, 20, 42);
+
+    values.forEach((value, index) => {
+      const centerY = canvas.height * rowCenters[index];
+
+      ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(value, canvas.width / 2, centerY - rowHeight * 0.04);
+
+      ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(labels[index], canvas.width / 2, centerY + rowHeight * 0.24);
     });
+  } else {
+    const gap = canvas.width * 0.012;
+    const cardWidth = (canvas.width - gap * 3) / 4;
+    const cardTop = canvas.height * 0.05;
+    const cardHeight = canvas.height * 0.8;
+    const valueFont = fitTextFontSize(
+      ctx,
+      values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
+      cardWidth * 0.9,
+      cardHeight * 0.6,
+      90,
+      Math.max(144, Math.round(settings.fontSize * 1.3))
+    );
+    const labelFont = fitTextFontSize(ctx, "HOURS", cardWidth * 0.64, cardHeight * 0.22, 20, 42);
 
-    if (groupIndex < groupOrigins.length - 1) {
-      const separatorRow = groupOrigins[groupIndex];
-      items.push({
-        char: ":",
-        originX: isStacked ? 0 : (groupOrigins[groupIndex].x + groupOrigins[groupIndex + 1].x) / 2,
-        originY: separatorRow.y,
-        scaleX: settings.separatorWidth,
-        scaleY: settings.separatorHeight,
-        sampleCount: Math.max(20, Math.round(settings.particlesPerGlyph * 0.22)),
-      });
-    }
-  });
+    values.forEach((value, index) => {
+      const centerX = cardWidth * (index + 0.5) + gap * index;
+      const valueY = cardTop + cardHeight * 0.45;
+      const labelY = cardTop + cardHeight * 0.8;
 
-  return items;
-}
+      ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(value, centerX, valueY);
 
-function Starfield({
-  quality,
-  reducedMotion,
-}: {
-  quality: QualityTier;
-  reducedMotion: boolean;
-}) {
-  const pointsRef = useRef<ThreePoints>(null!);
-  const count = quality === "high" ? 180 : quality === "medium" ? 132 : 88;
-
-  const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-
-    for (let index = 0; index < count; index += 1) {
-      const seed = index * 97.31;
-      arr[index * 3] = (hash01(seed + 1.1) - 0.5) * 18;
-      arr[index * 3 + 1] = (hash01(seed + 2.2) - 0.5) * 10.5;
-      arr[index * 3 + 2] = -3.5 - hash01(seed + 3.3) * 4.5;
-    }
-
-    return arr;
-  }, [count]);
-
-  useEffect(() => {
-    if (pointsRef.current) {
-      pointsRef.current.geometry.setAttribute("position", new BufferAttribute(positions, 3));
-    }
-  }, [positions]);
-
-  useFrame((state, delta) => {
-    if (pointsRef.current) {
-      pointsRef.current.rotation.y += delta * (reducedMotion ? 0.003 : 0.008);
-      pointsRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.04) * 0.01;
-    }
-  });
-
-  return (
-    <points ref={pointsRef} renderOrder={0}>
-      <bufferGeometry />
-      <pointsMaterial
-        size={0.012}
-        sizeAttenuation
-        transparent
-        opacity={0.95}
-        depthWrite={false}
-      />
-    </points>
-  );
-}
-
-function getPresentationScale(viewportWidth: number) {
-  if (viewportWidth >= 1440) {
-    return 1.12;
+      ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
+      ctx.fillText(labels[index], centerX, labelY);
+    });
   }
 
-  if (viewportWidth >= 1024) {
-    return 1.08;
+  const stride = settings.sampleStride;
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const points: SamplePoint[] = [];
+
+  for (let y = 0; y < canvas.height; y += stride) {
+    for (let x = 0; x < canvas.width; x += stride) {
+      const index = (y * canvas.width + x) * 4;
+      const alpha = image[index + 3];
+
+      if (alpha > 12) {
+        points.push({ x, y, alpha });
+      }
+    }
   }
 
-  if (viewportWidth < 640) {
-    return 0.98;
-  }
-
-  return 1;
+  return reduceSamplePoints(points, settings.maxParticles);
 }
 
-function createSystem(
-  countdown: CountdownValue,
-  settings: CountdownSettings,
-  glyphCache: Record<string, GlyphPoint[]>,
-  isStacked: boolean,
-  sceneOffsetY: number
-) {
-  const layout = computeLayout(countdown, settings, isStacked, sceneOffsetY);
-  const count = layout.reduce((total, item) => total + item.sampleCount, 0);
+function createParticleSystem(
+  points: SamplePoint[],
+  settings: CountdownSettings
+): ParticleSystem {
+  const count = Math.max(points.length, 1);
   const positions = new Float32Array(count * 3);
-  const targets = new Float32Array(count * 3);
+  const basePositions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
 
-  let particleOffset = 0;
+  const width = settings.canvasWidth;
+  const height = settings.canvasHeight;
 
-  layout.forEach((item, itemIndex) => {
-    const glyph = glyphCache[item.char] ?? glyphCache["0"];
+  for (let index = 0; index < count; index += 1) {
+    const point = points[index] ?? {
+      x: width / 2,
+      y: height / 2,
+      alpha: 255,
+    };
+    const seed = index * 997 + point.x * 31 + point.y * 17;
+    const normalizedX = point.x / width;
+    const normalizedY = point.y / height;
+    const alpha = point.alpha / 255;
+    const density = Math.min(1, Math.max(0, alpha));
+    const centerWeight = 1 - Math.min(1, Math.abs(normalizedX - 0.5) * 1.5 + Math.abs(normalizedY - 0.5) * 0.8);
 
-    for (let particleIndex = 0; particleIndex < item.sampleCount; particleIndex += 1) {
-      const point = glyph[particleIndex % glyph.length] ?? [0, 0];
-      const jitterSeed = itemIndex * 997 + particleIndex * 53 + item.char.charCodeAt(0) * 11;
-      const flowSeed = itemIndex * 313 + particleIndex * 17 + item.char.charCodeAt(0) * 7;
-      const offset = (particleOffset + particleIndex) * 3;
-      const sizeIndex = particleOffset + particleIndex;
-      const pointMix = hash01(flowSeed);
-      const toneRoll = hash01(jitterSeed + 97);
-      const isBright = hash01(jitterSeed + 41) > 0.86;
+    const baseX = (normalizedX - 0.5) * settings.sceneWidth;
+    const baseY = (0.5 - normalizedY) * settings.sceneHeight + settings.sceneOffsetY;
+    const baseZ = (hash01(seed + 19) - 0.5) * 0.06;
 
-      const targetX = item.originX + point[0] * item.scaleX;
-      const targetY = item.originY + point[1] * item.scaleY;
-      const targetZ = (hash01(jitterSeed + 19) - 0.5) * 0.04;
+    const jitterX = (hash01(seed) - 0.5) * settings.jitter;
+    const jitterY = (hash01(seed + 7) - 0.5) * settings.jitter;
+    const jitterZ = (hash01(seed + 13) - 0.5) * 0.04;
 
-      targets[offset] = targetX;
-      targets[offset + 1] = targetY;
-      targets[offset + 2] = targetZ;
+    const offset = index * 3;
+    basePositions[offset] = baseX;
+    basePositions[offset + 1] = baseY;
+    basePositions[offset + 2] = baseZ;
 
-      const settleX = (hash01(jitterSeed) - 0.5) * 0.26;
-      const settleY = (hash01(jitterSeed + 7) - 0.5) * 0.26;
-      const settleZ = (hash01(jitterSeed + 13) - 0.5) * 0.08;
+    positions[offset] = baseX + jitterX;
+    positions[offset + 1] = baseY + jitterY;
+    positions[offset + 2] = baseZ + jitterZ;
 
-      positions[offset] = targetX + settleX;
-      positions[offset + 1] = targetY + settleY;
-      positions[offset + 2] = targetZ + settleZ;
+    const toneRoll = hash01(seed + 23);
+    const tone =
+      density > 0.72 || centerWeight > 0.55
+        ? PALETTE[0]
+        : toneRoll > 0.55
+          ? PALETTE[1]
+          : PALETTE[2];
+    const rgb = {
+      r: Number.parseInt(tone.slice(1, 3), 16),
+      g: Number.parseInt(tone.slice(3, 5), 16),
+      b: Number.parseInt(tone.slice(5, 7), 16),
+    };
 
-      const color = getParticleColor(toneRoll, pointMix, isBright);
-      colors[offset] = color.r / 255;
-      colors[offset + 1] = color.g / 255;
-      colors[offset + 2] = color.b / 255;
-
-      sizes[sizeIndex] =
-        settings.pointSizeMin +
-        hash01(jitterSeed + 23) * (settings.pointSizeMax - settings.pointSizeMin) +
-        (isBright ? 0.008 : 0);
-    }
-    particleOffset += item.sampleCount;
-  });
+    colors[offset] = rgb.r / 255;
+    colors[offset + 1] = rgb.g / 255;
+    colors[offset + 2] = rgb.b / 255;
+    sizes[index] =
+      settings.pointSizeMin +
+      density * (settings.pointSizeMax - settings.pointSizeMin) +
+      (hash01(seed + 41) - 0.5) * 0.0035;
+  }
 
   return {
     positions,
-    targets,
+    basePositions,
     colors,
     sizes,
     count,
@@ -571,29 +467,44 @@ function createSystem(
 function CountdownParticles({
   reducedMotion,
   quality,
-  pointerTarget,
-  pointerNdc,
-  pointerActive,
   headerHeightPx,
+  containerWidthPx,
+  containerHeightPx,
+  countdown,
 }: {
   reducedMotion: boolean;
   quality: QualityTier;
-  pointerTarget: MutableRefObject<Vector3>;
-  pointerNdc: MutableRefObject<Vector2>;
-  pointerActive: MutableRefObject<boolean>;
   headerHeightPx: number;
+  containerWidthPx: number;
+  containerHeightPx: number;
+  countdown: CountdownValue;
 }) {
-  const pointsGeometryRef = useRef<BufferGeometry>(null!);
-  const materialRef = useRef<ShaderMaterial>(null!);
-  const pointerPlane = useMemo(() => new Plane(new Vector3(0, 0, 1), 0), []);
+  const [geometry] = useState(() => new BufferGeometry());
+  const positionAttributeRef = useRef<BufferAttribute | null>(null);
+  const glowMaterialRef = useRef<ShaderMaterial>(null!);
+  const coreMaterialRef = useRef<ShaderMaterial>(null!);
+  const pointerActive = useRef(false);
   const viewportWidth = useViewportWidth();
   const viewportHeight = useViewportHeight();
-  const isStacked = useLayoutMode();
-  const cameraZ = isStacked ? 8.15 : 7.15;
+  const stacked = useStackedLayout();
+  const cameraZ = stacked ? 8.15 : 7.35;
   const cameraFov = 42;
   const cameraViewportHeight = useMemo(
     () => 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360),
     [cameraZ]
+  );
+  const settings = useMemo(
+    () =>
+      getSettings(
+        quality,
+        stacked,
+        viewportWidth,
+        cameraZ,
+        cameraFov,
+        containerWidthPx,
+        containerHeightPx
+      ),
+    [cameraFov, cameraZ, containerHeightPx, containerWidthPx, quality, stacked, viewportWidth]
   );
   const sceneOffsetY = useMemo(() => {
     const headerWorldHeight = pixelsToWorldUnits(
@@ -601,129 +512,151 @@ function CountdownParticles({
       viewportHeight,
       cameraViewportHeight
     );
-
-    return -(headerWorldHeight / 2) - 0.38;
-  }, [cameraViewportHeight, headerHeightPx, viewportHeight]);
-  const presentationScale = useMemo(
-    () => getPresentationScale(viewportWidth),
-    [viewportWidth]
+    return settings.sceneOffsetY - headerWorldHeight * 0.08;
+  }, [cameraViewportHeight, headerHeightPx, settings.sceneOffsetY, viewportHeight]);
+  const sampledPoints = useMemo(
+    () => drawCountdownCanvas(countdown, stacked, settings),
+    [countdown, settings, stacked]
   );
-  const settings = useMemo(
-    () => getSettings(quality, presentationScale),
-    [quality, presentationScale]
-  );
-  const glyphCache = useMemo(() => buildGlyphCache(settings), [settings]);
-  const countdown = useCountdown(EVENT_START);
-  const countdownRef = useRef(countdown);
-  const [system, setSystem] = useState<ParticleSystem>(() =>
-    createSystem(countdown, settings, glyphCache, isStacked, sceneOffsetY)
+  const system = useMemo(
+    () => createParticleSystem(sampledPoints, { ...settings, sceneOffsetY }),
+    [sampledPoints, sceneOffsetY, settings]
   );
   const systemRef = useRef(system);
-
-  useEffect(() => {
-    countdownRef.current = countdown;
-  }, [countdown]);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setSystem(
-        createSystem(countdownRef.current, settings, glyphCache, isStacked, sceneOffsetY)
-      );
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [glyphCache, isStacked, sceneOffsetY, settings]);
+  const pointerWorld = useRef(new Vector3(0, 0, 0));
+  const pointerDebugCount = useRef(0);
+  const hitPlaneScale = useMemo(
+    () => [settings.sceneWidth, settings.sceneHeight, 1] as const,
+    [settings.sceneHeight, settings.sceneWidth]
+  );
+  const waveXFrequency = useMemo(
+    () => (Math.PI * 2 * 1.4) / Math.max(0.001, settings.sceneWidth),
+    [settings.sceneWidth]
+  );
+  const waveYFrequency = useMemo(
+    () => (Math.PI * 2 * 1.05) / Math.max(0.001, settings.sceneHeight),
+    [settings.sceneHeight]
+  );
 
   useEffect(() => {
     systemRef.current = system;
-
-    if (pointsGeometryRef.current) {
-      pointsGeometryRef.current.setAttribute("position", new BufferAttribute(system.positions, 3));
-      pointsGeometryRef.current.setAttribute("aColor", new BufferAttribute(system.colors, 3));
-      pointsGeometryRef.current.setAttribute("aSize", new BufferAttribute(system.sizes, 1));
-    }
-  }, [system]);
+    geometry.setAttribute("position", new BufferAttribute(system.positions, 3));
+    geometry.setAttribute("aColor", new BufferAttribute(system.colors, 3));
+    geometry.setAttribute("aSize", new BufferAttribute(system.sizes, 1));
+    positionAttributeRef.current = geometry.getAttribute("position") as BufferAttribute;
+    geometry.computeBoundingSphere();
+  }, [geometry, system]);
 
   useEffect(() => {
-    const current = systemRef.current;
-    const layout = computeLayout(countdown, settings, isStacked, sceneOffsetY);
-    let particleOffset = 0;
-
-    layout.forEach((item, itemIndex) => {
-      const glyph = glyphCache[item.char] ?? glyphCache["0"];
-
-      for (let particleIndex = 0; particleIndex < item.sampleCount; particleIndex += 1) {
-        const point = glyph[particleIndex % glyph.length] ?? [0, 0];
-        const offset = (particleOffset + particleIndex) * 3;
-
-        current.targets[offset] = item.originX + point[0] * item.scaleX;
-        current.targets[offset + 1] = item.originY + point[1] * item.scaleY;
-        current.targets[offset + 2] = (hash01(itemIndex * 313 + particleIndex * 17) - 0.5) * 0.04;
-      }
-
-      particleOffset += item.sampleCount;
-    });
-  }, [countdown, glyphCache, isStacked, sceneOffsetY, settings]);
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
 
   useFrame((state) => {
     const current = systemRef.current;
-    const repelRadius = reducedMotion ? 0.24 : 0.36;
-    const repelStrength = reducedMotion ? 0.11 : 0.18;
-    const damp = reducedMotion ? 0.07 : 0.16;
-    const pointer = pointerTarget.current;
+    const pointer = pointerWorld.current;
+    const repelRadius = reducedMotion ? 0.2 : 0.32;
+    const repelStrength = reducedMotion ? 0.09 : 0.16;
+    const settle = reducedMotion ? 0.08 : 0.14;
 
-    if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      materialRef.current.uniforms.uPointScale.value = settings.pointSizeScale;
+    if (glowMaterialRef.current) {
+      glowMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
+      glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
+      glowMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
+      glowMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
     }
 
-    state.camera.position.z += (cameraZ - state.camera.position.z) * 0.05;
-
-    if (pointerActive.current) {
-      state.raycaster.setFromCamera(pointerNdc.current, state.camera);
-      state.raycaster.ray.intersectPlane(pointerPlane, pointer);
+    if (coreMaterialRef.current) {
+      coreMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      coreMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
+      coreMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
+      coreMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
+      coreMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
     }
+
+    state.camera.position.z = MathUtils.lerp(state.camera.position.z, cameraZ, 0.06);
 
     for (let index = 0; index < current.count; index += 1) {
       const offset = index * 3;
-      const px = current.positions[offset];
-      const py = current.positions[offset + 1];
-      const dx = px - pointer.x;
-      const dy = py - pointer.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const baseX = current.basePositions[offset];
+      const baseY = current.basePositions[offset + 1];
+      const baseZ = current.basePositions[offset + 2];
 
-      let targetX = current.targets[offset];
-      let targetY = current.targets[offset + 1];
-      let targetZ = current.targets[offset + 2];
+      let desiredX = baseX;
+      let desiredY = baseY;
+      let desiredZ = baseZ;
 
-      if (distance < repelRadius) {
-        const push = (repelRadius - distance) * repelStrength;
-        const inverse = 1 / Math.max(distance, 0.0001);
-        const nx = dx * inverse;
-        const ny = dy * inverse;
+      if (pointerActive.current) {
+        const dx = baseX - pointer.x;
+        const dy = baseY - pointer.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-        targetX += nx * push;
-        targetY += ny * push;
-        targetZ += (hash01(index * 19 + state.clock.elapsedTime * 3) - 0.5) * push * 0.1;
+        if (distance < repelRadius) {
+          const influence = 1 - distance / repelRadius;
+          const inverse = 1 / Math.max(distance, 0.0001);
+          desiredX += dx * inverse * influence * repelStrength;
+          desiredY += dy * inverse * influence * repelStrength;
+          desiredZ +=
+            (hash01(index * 19 + state.clock.elapsedTime * 2.5) - 0.5) * influence * 0.05;
+        }
       }
 
-      current.positions[offset] += (targetX - current.positions[offset]) * damp;
-      current.positions[offset + 1] += (targetY - current.positions[offset + 1]) * damp;
-      current.positions[offset + 2] += (targetZ - current.positions[offset + 2]) * damp;
+      current.positions[offset] = MathUtils.lerp(current.positions[offset], desiredX, settle);
+      current.positions[offset + 1] = MathUtils.lerp(
+        current.positions[offset + 1],
+        desiredY,
+        settle
+      );
+      current.positions[offset + 2] = MathUtils.lerp(
+        current.positions[offset + 2],
+        desiredZ,
+        settle
+      );
     }
 
-    if (pointsGeometryRef.current?.attributes.position) {
-      pointsGeometryRef.current.attributes.position.needsUpdate = true;
+    if (positionAttributeRef.current) {
+      positionAttributeRef.current.needsUpdate = true;
     }
   });
 
+  const handlePointerMove = (event: ThreeEvent<PointerEvent>) => {
+    pointerWorld.current.copy(event.point);
+    pointerActive.current = true;
+
+    if (pointerDebugCount.current < 8) {
+      pointerDebugCount.current += 1;
+      console.debug("[countdown pointer]", {
+        point: event.point.toArray(),
+        container: [containerWidthPx, containerHeightPx],
+        scene: [settings.sceneWidth, settings.sceneHeight],
+      });
+    }
+  };
+
+  const handlePointerLeave = () => {
+    pointerActive.current = false;
+    pointerWorld.current.set(999, 999, 999);
+  };
+
   return (
     <group>
-      <Starfield quality={quality} reducedMotion={reducedMotion} />
-      <points>
-        <bufferGeometry ref={pointsGeometryRef} />
+      <mesh
+        position={[0, 0, 0]}
+        scale={hitPlaneScale}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+      >
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      <points geometry={geometry} renderOrder={2}>
         <shaderMaterial
-          ref={materialRef}
+          ref={glowMaterialRef}
           vertexShader={vertexShader}
           fragmentShader={fragmentShader}
           transparent
@@ -731,7 +664,36 @@ function CountdownParticles({
           blending={AdditiveBlending}
           uniforms={{
             uTime: { value: 0 },
-            uPointScale: { value: settings.pointSizeScale },
+            uPointScale: { value: settings.pointScale },
+            uLayerScale: { value: 1.55 },
+            uOpacity: { value: 0.3 },
+            uSoftness: { value: 1 },
+            uSceneWidth: { value: settings.sceneWidth },
+            uSceneHeight: { value: settings.sceneHeight },
+            uWaveXFrequency: { value: waveXFrequency },
+            uWaveYFrequency: { value: waveYFrequency },
+          }}
+        />
+      </points>
+
+      <points geometry={geometry} renderOrder={3}>
+        <shaderMaterial
+          ref={coreMaterialRef}
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          transparent
+          depthWrite={false}
+          blending={AdditiveBlending}
+          uniforms={{
+            uTime: { value: 0 },
+            uPointScale: { value: settings.pointScale },
+            uLayerScale: { value: 0.88 },
+            uOpacity: { value: 0.96 },
+            uSoftness: { value: 0 },
+            uSceneWidth: { value: settings.sceneWidth },
+            uSceneHeight: { value: settings.sceneHeight },
+            uWaveXFrequency: { value: waveXFrequency },
+            uWaveYFrequency: { value: waveYFrequency },
           }}
         />
       </points>
@@ -744,26 +706,15 @@ export function CountdownScene({
   reducedMotion,
   quality,
   headerHeightPx,
+  containerWidthPx,
+  containerHeightPx,
+  countdown,
 }: CountdownSceneProps) {
-  const pointerTarget = useRef(new Vector3(999, 999, 999));
-  const pointerNdc = useRef(new Vector2(0, 0));
-  const pointerActive = useRef(false);
-  const [liveQuality, setLiveQuality] = useState<QualityTier>(quality);
-  const dprCap = liveQuality === "high" ? 1.5 : liveQuality === "medium" ? 1.25 : 1;
-
-  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    pointerNdc.current.set(
-      ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -(((event.clientY - rect.top) / rect.height) * 2 - 1)
-    );
-    pointerActive.current = true;
-  };
-
-  const handlePointerLeave = () => {
-    pointerActive.current = false;
-    pointerTarget.current.set(999, 999, 999);
-  };
+  const safeCountdown = useMemo(
+    () => countdown ?? { days: "00", hours: "00", minutes: "00", seconds: "00" },
+    [countdown]
+  );
+  const dprCap = quality === "high" ? 1.5 : quality === "medium" ? 1.25 : 1;
 
   return (
     <Canvas
@@ -771,47 +722,29 @@ export function CountdownScene({
       frameloop={active ? "always" : "demand"}
       gl={{
         alpha: true,
-        antialias: liveQuality !== "low",
+        antialias: quality !== "low",
         depth: true,
         stencil: false,
         powerPreference: "high-performance",
       }}
-      camera={{ position: [0, 0, 7.15], fov: 42 }}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
+      camera={{ position: [0, 0, 7.35], fov: 42 }}
       className="h-full w-full"
       style={{ touchAction: "pan-y" }}
     >
-      <color attach="background" args={["#030305"]} />
-      <ambientLight intensity={1.8} />
-      <directionalLight position={[4, 6, 8]} intensity={2.2} color="#dffcff" />
-      <directionalLight position={[-4, -2, -4]} intensity={1.2} color="#0055ff" />
-      <AdaptiveDpr pixelated={liveQuality === "low"} />
+      <color attach="background" args={["#030303"]} />
+      <ambientLight intensity={1.25} />
+      <directionalLight position={[4, 6, 8]} intensity={1.7} color="#f4f4f4" />
+      <directionalLight position={[-4, -2, -4]} intensity={0.55} color="#b9b9b9" />
+      <AdaptiveDpr pixelated={quality === "low"} />
       <AdaptiveEvents />
-      <PerformanceMonitor
-        onDecline={() => {
-          setLiveQuality((current) => (current === "high" ? "medium" : "low"));
-        }}
-        onIncline={() => {
-          setLiveQuality((current) => (current === "low" ? "medium" : "high"));
-        }}
-      />
       <CountdownParticles
         reducedMotion={reducedMotion}
-        quality={liveQuality}
-        pointerTarget={pointerTarget}
-        pointerNdc={pointerNdc}
-        pointerActive={pointerActive}
+        quality={quality}
         headerHeightPx={headerHeightPx}
+        containerWidthPx={containerWidthPx}
+        containerHeightPx={containerHeightPx}
+        countdown={safeCountdown}
       />
-      <EffectComposer multisampling={0}>
-        <Bloom
-          intensity={0.4}
-          luminanceThreshold={0.4}
-          luminanceSmoothing={0.6}
-          mipmapBlur={false}
-        />
-      </EffectComposer>
     </Canvas>
   );
 }
