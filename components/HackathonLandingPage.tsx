@@ -12,6 +12,7 @@ import { SiteHeader } from "./SiteHeader";
 import { CountdownScene } from "./CountdownScene";
 import WaveBackground from "./WaveBackground";
 import { formatCountdownParts, getCountdownStage, padTwo } from "@/lib/countdown";
+import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
 
 type ScheduleItem = {
   id: string;
@@ -375,10 +376,12 @@ function CountdownSection() {
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeightPx, setHeaderHeightPx] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
+  const [quality, setQuality] = useState<QualityTier>("medium");
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setIsMounted(true);
+      setQuality(getDeviceQuality());
     });
 
     return () => window.cancelAnimationFrame(frame);
@@ -439,7 +442,7 @@ function CountdownSection() {
             <CountdownWebGLFrame
               active={isInView}
               reducedMotion={reducedMotion}
-              quality="medium"
+              quality={quality}
               headerHeightPx={headerHeightPx}
               values={values}
             />

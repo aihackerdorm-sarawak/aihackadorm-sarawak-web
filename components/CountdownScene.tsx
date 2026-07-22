@@ -52,6 +52,8 @@ type CountdownSettings = {
   pointScale: number;
   sampleStride: number;
   maxParticles: number;
+  glowLayerScale: number;
+  glowOpacity: number;
 };
 
 type ParticleSystem = {
@@ -256,10 +258,16 @@ function getSettings(
       pointScale: 3.9 * viewportScale * particleScale,
       sampleStride: stacked ? 8 : 8,
       maxParticles: stacked ? 4400 : 6200,
+      glowLayerScale: 1.9,
+      glowOpacity: 0.32,
     };
   }
 
   if (quality === "low") {
+    // Mobile / low-power tier. A much tighter glow (small layerScale + low
+    // opacity + small crisp dots) both cuts additive-blend fill rate — the
+    // main mobile-GPU bottleneck on Firefox/Safari — and keeps the dots from
+    // merging into blobs, so the digits read cleaner, not just cheaper.
     return {
       canvasWidth: stacked ? 760 : 1120,
       canvasHeight: stacked ? 860 : 280,
@@ -268,11 +276,13 @@ function getSettings(
       sceneWidth: visibleWidth * layoutScale,
       sceneHeight: visibleHeight * layoutScale,
       sceneOffsetY: stacked ? -0.17 : -0.06,
-      pointSizeMin: 0.026 * viewportScale * particleScale,
-      pointSizeMax: 0.05 * viewportScale * particleScale,
-      pointScale: 3.1 * viewportScale * particleScale,
-      sampleStride: stacked ? 10 : 10,
-      maxParticles: stacked ? 2600 : 3600,
+      pointSizeMin: 0.023 * viewportScale * particleScale,
+      pointSizeMax: 0.044 * viewportScale * particleScale,
+      pointScale: 3.0 * viewportScale * particleScale,
+      sampleStride: stacked ? 9 : 9,
+      maxParticles: stacked ? 2400 : 3400,
+      glowLayerScale: 1.35,
+      glowOpacity: 0.24,
     };
   }
 
@@ -289,6 +299,8 @@ function getSettings(
     pointScale: 3.5 * viewportScale * particleScale,
     sampleStride: stacked ? 8 : 8,
     maxParticles: stacked ? 3700 : 5200,
+    glowLayerScale: 1.7,
+    glowOpacity: 0.3,
   };
 }
 
@@ -928,6 +940,8 @@ function CountdownDigitGroup({
     if (glowMaterialRef.current) {
       glowMaterialRef.current.uniforms.uTime.value = t;
       glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      glowMaterialRef.current.uniforms.uLayerScale.value = settings.glowLayerScale;
+      glowMaterialRef.current.uniforms.uOpacity.value = settings.glowOpacity;
       glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
       glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
       glowMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
@@ -1034,8 +1048,8 @@ function CountdownDigitGroup({
           uniforms={{
             uTime: { value: 0 },
             uPointScale: { value: settings.pointScale },
-            uLayerScale: { value: 1.9 },
-            uOpacity: { value: 0.32 },
+            uLayerScale: { value: settings.glowLayerScale },
+            uOpacity: { value: settings.glowOpacity },
             uSoftness: { value: 1 },
             uGlowInner: { value: 0.05 },
             uGlowOuter: { value: 0.5 },
@@ -1225,7 +1239,10 @@ export function CountdownScene({
     () => countdown ?? { days: "00", hours: "00", minutes: "00", seconds: "00" },
     [countdown]
   );
-  const dprCap = quality === "high" ? 1.5 : quality === "medium" ? 1.25 : 1;
+  // Low tier gets a higher DPR than before (1.4 vs 1) for crisper mobile
+  // digits; the much smaller glow footprint keeps total fill rate well below
+  // where it was, so this is a net win on both looks and performance.
+  const dprCap = quality === "high" ? 1.75 : quality === "medium" ? 1.5 : 1.4;
 
   return (
     <Canvas
