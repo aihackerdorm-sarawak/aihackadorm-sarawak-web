@@ -267,7 +267,7 @@ function CountdownWebGLFrame({
   return (
     <div
       ref={frameRef}
-      className="relative h-[500px] md:h-[300px] w-full overflow-hidden rounded-[30px] bg-black/40"
+      className="relative h-[560px] md:h-[300px] w-full overflow-hidden rounded-[30px] bg-black/40"
     >
       {/* <CountdownLabels /> */}
       <CountdownScene
@@ -473,10 +473,25 @@ function CountdownSection() {
 function HeroSection() {
   const reducedMotion = useReducedMotion() ?? true;
   const navigate = useScrollToId();
+  const { graphicsEnabled } = useGraphicsMode();
+  const { ref, isInView } = useSectionObserver<HTMLElement>();
 
   return (
-    <section id="hero" className="relative overflow-hidden px-4 pb-14 pt-10 sm:px-6 sm:pb-16 lg:px-8">
-      <div className="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
+    <section
+      ref={ref}
+      id="hero"
+      className="relative isolate overflow-hidden px-4 pb-14 pt-10 sm:px-6 sm:pb-16 lg:px-8"
+    >
+      {graphicsEnabled ? (
+        <div className="pointer-events-none absolute inset-0 z-0">
+          <WaveBackground active={isInView} />
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.4),rgba(3,3,3,0.72))]" />
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute inset-0 z-0 bg-[#030303]" />
+      )}
+
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
         <div className="max-w-3xl space-y-6">
           <motion.p
             initial={reducedMotion ? false : { opacity: 0, y: 10 }}

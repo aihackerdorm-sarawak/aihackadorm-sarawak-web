@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import { ChevronDown, Menu, Sparkles } from "lucide-react";
+import { ChevronDown, Menu, Sparkles, X } from "lucide-react";
 import { useGraphicsMode } from "./GraphicsMode";
 
 type SiteHeaderProps = {
@@ -32,17 +33,23 @@ function LogoMark() {
 
 export function SiteHeader({ onNavigate }: SiteHeaderProps) {
   const { graphicsEnabled, toggleGraphics } = useGraphicsMode();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleNavigate = (id: string) => {
+    setMenuOpen(false);
+    onNavigate(id);
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#030303]/86 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <button
           type="button"
-          onClick={() => onNavigate("hero")}
+          onClick={() => handleNavigate("hero")}
           className="flex min-w-0 items-center gap-3 text-left"
         >
           <LogoMark />
-          <span className="min-w-0">
+          <span className="hidden min-w-0 sm:block">
             <span className="block font-mono text-[9px] uppercase tracking-[0.42em] text-white/45">
               Hackathon
             </span>
@@ -57,7 +64,7 @@ export function SiteHeader({ onNavigate }: SiteHeaderProps) {
             <button
               key={item.id}
               type="button"
-              onClick={() => onNavigate(item.id)}
+              onClick={() => handleNavigate(item.id)}
               className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
             >
               {item.label}
@@ -82,7 +89,7 @@ export function SiteHeader({ onNavigate }: SiteHeaderProps) {
             type="button"
             disabled
             title="Coming Soon"
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white text-[10px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-85 sm:px-4 sm:py-2 sm:text-[11px]"
+            className="hidden items-center gap-1.5 rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-85 sm:inline-flex sm:px-4 sm:py-2 sm:text-[11px]"
           >
             <span>Coming Soon</span>
             <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
@@ -90,13 +97,42 @@ export function SiteHeader({ onNavigate }: SiteHeaderProps) {
 
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 transition-colors hover:border-white/25 hover:bg-white/10 lg:hidden"
+            onClick={() => setMenuOpen((open) => !open)}
             aria-label="Navigation menu"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 transition-colors hover:border-white/25 hover:bg-white/10 lg:hidden"
           >
-            <Menu className="h-4 w-4" />
+            {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </div>
       </div>
+
+      {menuOpen ? (
+        <nav id="mobile-nav" className="border-t border-white/10 bg-[#030303]/95 backdrop-blur-xl lg:hidden">
+          <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 sm:px-6">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavigate(item.id)}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-[11px] uppercase tracking-[0.26em] text-white/75 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
+              >
+                {item.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled
+              title="Coming Soon"
+              className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/15 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 disabled:cursor-not-allowed"
+            >
+              <span>Coming Soon</span>
+              <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+            </button>
+          </div>
+        </nav>
+      ) : null}
     </header>
   );
 }

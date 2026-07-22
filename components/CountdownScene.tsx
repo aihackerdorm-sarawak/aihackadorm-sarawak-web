@@ -76,6 +76,7 @@ varying float vSeed;
 uniform float uTime;
 uniform float uPointScale;
 uniform float uLayerScale;
+uniform float uDprScale;
 uniform float uSceneWidth;
 uniform float uSceneHeight;
 uniform float uWaveXFrequency;
@@ -97,7 +98,12 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
   float perspective = 245.0 / max(0.001, -mvPosition.z);
 
-  gl_PointSize = aSize * uPointScale * uLayerScale * perspective;
+  // gl_PointSize is in framebuffer pixels, so a fixed value renders at a
+  // different on-screen size depending on the device pixel ratio (making
+  // dots blob together at low DPR and shrink at high DPR). uDprScale =
+  // rendererPixelRatio / REFERENCE_DPR cancels that out, keeping each dot a
+  // consistent on-screen size across displays, zoom levels, and builds.
+  gl_PointSize = aSize * uPointScale * uLayerScale * perspective * uDprScale;
   gl_Position = projectionMatrix * mvPosition;
 }
 `;
@@ -241,13 +247,17 @@ function getSettings(
   const visibleHeight = 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360);
   const aspect = measuredWidth / measuredHeight;
   const visibleWidth = visibleHeight * aspect;
-  const layoutScale = stacked ? 0.85 : 0.90;
+  const layoutScale = stacked ? 0.92 : 0.90;
   const particleScale = quality === "high" ? 1.02 : quality === "medium" ? 0.98 : 0.94;
 
   if (quality === "high") {
     return {
-      canvasWidth: 1500,
-      canvasHeight: 380,
+      // Must be stacked-aware like the other tiers: a portrait (tall) canvas
+      // for the stacked 4-row mobile layout, landscape for the desktop row.
+      // Without this, a narrow window on the high tier feeds a portrait layout
+      // through a landscape canvas and the digits render squished/distorted.
+      canvasWidth: stacked ? 820 : 1500,
+      canvasHeight: stacked ? 940 : 380,
       fontSize: stacked ? 128 : 138,
       layoutScale,
       sceneWidth: visibleWidth * layoutScale,
@@ -368,9 +378,12 @@ function computeFontSizes(
   );
 
   if (stacked) {
+    // Mobile: digits were height-limited to ~45% of each row, leaving a lot
+    // of empty space. Let them fill more of the row (and the wide horizontal
+    // room) so the countdown reads much larger on small screens.
     const rowHeight = settings.canvasHeight / 4;
-    const maxTextWidth = settings.canvasWidth * 0.6;
-    const maxTextHeight = rowHeight * 0.45;
+    const maxTextWidth = settings.canvasWidth * 0.8;
+    const maxTextHeight = rowHeight * 0.55;
 
     const valueFont = fitTextFontSize(
       ctx,
@@ -378,9 +391,9 @@ function computeFontSizes(
       maxTextWidth,
       maxTextHeight,
       48,
-      Math.max(90, Math.round(settings.fontSize * 1.1))
+      Math.max(140, Math.round(settings.fontSize * 1.45))
     );
-    const labelFont = fitTextFontSize(ctx, "HOURS", settings.canvasWidth * 0.4, rowHeight * 0.15, 16, 36);
+    const labelFont = fitTextFontSize(ctx, "HOURS", settings.canvasWidth * 0.44, rowHeight * 0.16, 16, 40);
 
     return { valueFont, labelFont };
   }
@@ -514,6 +527,13 @@ function drawLabelPoints(
 
 const LABEL_SIZE_SCALE = 0.55;
 const FLASH_SIZE_BOOST = 0.55;
+
+// The device pixel ratio the dot sizes are tuned against. gl_PointSize is
+// scaled by (actualPixelRatio / REFERENCE_DPR) so a dot keeps the same
+// on-screen size regardless of the display's DPR, the browser zoom, or
+// whether AdaptiveDpr has lowered the render resolution. 1.5 matches a
+// typical laptop; nudge this one value if dots read a touch large/small.
+const REFERENCE_DPR = 1.5;
 
 // Damped-spring constants for how a dot returns to rest after being
 // repelled or reassigned to a new target. Higher stiffness pulls harder;
@@ -937,11 +957,14 @@ function CountdownDigitGroup({
       sizeAttribute.needsUpdate = true;
     }
 
+    const dprScale = state.gl.getPixelRatio() / REFERENCE_DPR;
+
     if (glowMaterialRef.current) {
       glowMaterialRef.current.uniforms.uTime.value = t;
       glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
       glowMaterialRef.current.uniforms.uLayerScale.value = settings.glowLayerScale;
       glowMaterialRef.current.uniforms.uOpacity.value = settings.glowOpacity;
+      glowMaterialRef.current.uniforms.uDprScale.value = dprScale;
       glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
       glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
       glowMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
@@ -951,6 +974,7 @@ function CountdownDigitGroup({
     if (coreMaterialRef.current) {
       coreMaterialRef.current.uniforms.uTime.value = t;
       coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      coreMaterialRef.current.uniforms.uDprScale.value = dprScale;
       coreMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
       coreMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
       coreMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
@@ -1049,6 +1073,7 @@ function CountdownDigitGroup({
             uTime: { value: 0 },
             uPointScale: { value: settings.pointScale },
             uLayerScale: { value: settings.glowLayerScale },
+            uDprScale: { value: 1 },
             uOpacity: { value: settings.glowOpacity },
             uSoftness: { value: 1 },
             uGlowInner: { value: 0.05 },
@@ -1075,6 +1100,7 @@ function CountdownDigitGroup({
             uTime: { value: 0 },
             uPointScale: { value: settings.pointScale },
             uLayerScale: { value: 0.88 },
+            uDprScale: { value: 1 },
             uOpacity: { value: 0.96 },
             uSoftness: { value: 0 },
             uGlowInner: { value: 0.14 },
