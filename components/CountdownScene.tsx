@@ -59,6 +59,7 @@ type ParticleSystem = {
   basePositions: Float32Array;
   colors: Float32Array;
   sizes: Float32Array;
+  baseSizes: Float32Array;
   count: number;
 };
 
@@ -67,6 +68,7 @@ attribute float aSize;
 attribute vec3 aColor;
 
 varying vec3 vColor;
+varying float vSeed;
 
 uniform float uTime;
 uniform float uPointScale;
@@ -78,6 +80,7 @@ uniform float uWaveYFrequency;
 
 void main() {
   vColor = aColor;
+  vSeed = fract(sin(dot(position.xy, vec2(12.9898, 78.233))) * 43758.5453);
 
   vec3 displaced = position;
   float normalizedX = position.x / max(0.001, uSceneWidth);
@@ -98,11 +101,15 @@ void main() {
 
 const fragmentShader = `
 varying vec3 vColor;
+varying float vSeed;
 
+uniform float uTime;
 uniform float uOpacity;
 uniform float uSoftness;
 uniform float uGlowInner;
 uniform float uGlowOuter;
+uniform float uTwinkle;
+uniform vec3 uTintColor;
 
 void main() {
   vec2 uv = gl_PointCoord - vec2(0.5);
@@ -111,7 +118,9 @@ void main() {
   float core = 1.0 - smoothstep(0.0, 0.42, dist);
   float alpha = mix(core, core * 0.6 + glow * 0.4, uSoftness);
 
-  gl_FragColor = vec4(vColor, alpha * uOpacity);
+  float twinkle = 1.0 + sin(uTime * 3.7 + vSeed * 6.28318) * uTwinkle;
+
+  gl_FragColor = vec4(vColor * uTintColor, alpha * uOpacity * twinkle);
 }
 `;
 
@@ -491,6 +500,7 @@ function drawLabelPoints(
 }
 
 const LABEL_SIZE_SCALE = 0.55;
+const FLASH_SIZE_BOOST = 0.55;
 
 const PALETTE_RGB = PALETTE.map(
   (hex) =>
@@ -541,7 +551,8 @@ function writeTargetIntoArrays(
   poolIndex: number,
   basePositions: Float32Array,
   colors: Float32Array,
-  sizes: Float32Array
+  sizes: Float32Array,
+  baseSizes: Float32Array
 ) {
   const offset = poolIndex * 3;
   basePositions[offset] = target.x;
@@ -552,8 +563,10 @@ function writeTargetIntoArrays(
   colors[offset + 1] = target.tone[1];
   colors[offset + 2] = target.tone[2];
 
-  sizes[poolIndex] =
+  const size =
     (settings.pointSizeMin + target.density * (settings.pointSizeMax - settings.pointSizeMin)) * sizeScale;
+  sizes[poolIndex] = size;
+  baseSizes[poolIndex] = size;
 }
 
 // Greedy nearest-neighbor matching: each pooled particle claims the closest
@@ -686,6 +699,8 @@ function CountdownDigitGroup({
   const systemRef = useRef<ParticleSystem | null>(null);
   const structuralKeyRef = useRef<string>("");
   const charPoolRef = useRef<{ offsets: number[]; sizes: number[]; chars: string[] } | null>(null);
+  const charFlashRef = useRef<number[]>([]);
+  const settleCompleteRef = useRef(false);
 
   const poolSize = useMemo(
     () => Math.max(1, Math.ceil(settings.maxParticles / 4)),
@@ -726,9 +741,10 @@ function CountdownDigitGroup({
     const basePositions = new Float32Array(poolSize * 3);
     const colors = new Float32Array(poolSize * 3);
     const sizes = new Float32Array(poolSize);
+    const baseSizes = new Float32Array(poolSize);
 
     for (let i = 0; i < labelCount; i += 1) {
-      writeTargetIntoArrays(labelTargets[i], settings, LABEL_SIZE_SCALE, i, basePositions, colors, sizes);
+      writeTargetIntoArrays(labelTargets[i], settings, LABEL_SIZE_SCALE, i, basePositions, colors, sizes, baseSizes);
     }
 
     chars.forEach((char, charIndex) => {
@@ -744,13 +760,23 @@ function CountdownDigitGroup({
           sampleCount > 0
             ? charTargets[i % sampleCount]
             : { x: 0, y: sceneOffsetY, z: 0, density: 0, tone: PALETTE_RGB[2] };
-        writeTargetIntoArrays(target, settings, 1, charPoolOffsets[charIndex] + i, basePositions, colors, sizes);
+        writeTargetIntoArrays(
+          target,
+          settings,
+          1,
+          charPoolOffsets[charIndex] + i,
+          basePositions,
+          colors,
+          sizes,
+          baseSizes
+        );
       }
     });
 
     positions.set(basePositions);
-    systemRef.current = { positions, basePositions, colors, sizes, count: poolSize };
+    systemRef.current = { positions, basePositions, colors, sizes, baseSizes, count: poolSize };
     charPoolRef.current = { offsets: charPoolOffsets, sizes: charPoolSizes, chars: chars.slice() };
+    charFlashRef.current = chars.map(() => 0);
 
     geometry.setAttribute("position", new BufferAttribute(positions, 3));
     geometry.setAttribute("aColor", new BufferAttribute(colors, 3));
@@ -800,18 +826,31 @@ function CountdownDigitGroup({
       const assignment = assignNearestTargets(system.positions, poolOffset, poolCount, charTargets, cellSize);
       for (let i = 0; i < poolCount; i += 1) {
         const target = charTargets[assignment[i]];
-        writeTargetIntoArrays(target, settings, 1, poolOffset + i, system.basePositions, system.colors, system.sizes);
+        writeTargetIntoArrays(
+          target,
+          settings,
+          1,
+          poolOffset + i,
+          system.basePositions,
+          system.colors,
+          system.sizes,
+          system.baseSizes
+        );
       }
+
+      // Only this digit's slot range gets a flash pulse — the sibling
+      // digit (and label) that didn't change stays completely still.
+      charFlashRef.current[charIndex] = 1;
     });
 
     if (!changed) {
       return;
     }
 
+    settleCompleteRef.current = false;
+
     const colorAttribute = geometry.getAttribute("aColor") as BufferAttribute;
-    const sizeAttribute = geometry.getAttribute("aSize") as BufferAttribute;
     colorAttribute.needsUpdate = true;
-    sizeAttribute.needsUpdate = true;
   }, [value, index, stacked, settings, sceneOffsetY, valueFont, geometry]);
 
   useEffect(() => {
@@ -825,13 +864,55 @@ function CountdownDigitGroup({
     if (!current) {
       return;
     }
+    const t = state.clock.elapsedTime;
     const pointer = pointerWorld.current;
     const repelRadius = reducedMotion ? 0.2 : 0.32;
     const repelStrength = reducedMotion ? 0.09 : 0.16;
     const settle = reducedMotion ? 0.1 : 0.16;
 
+    if (pointerActive.current) {
+      settleCompleteRef.current = false;
+    }
+
+    // Per-digit flash: only the slot range belonging to the digit that just
+    // changed gets a brief size pop, decaying back to its resting size.
+    // The sibling digit (and the label) are never touched, so only the
+    // digit that actually ticked visibly reacts.
+    const charPool = charPoolRef.current;
+    const charFlash = charFlashRef.current;
+    let flashActive = false;
+    let sizesDirty = false;
+
+    if (charPool) {
+      for (let c = 0; c < charFlash.length; c += 1) {
+        const offset = charPool.offsets[c];
+        const count = charPool.sizes[c];
+
+        if (charFlash[c] > 0.004) {
+          charFlash[c] *= 0.7;
+          flashActive = true;
+          sizesDirty = true;
+          const boost = 1 + charFlash[c] * FLASH_SIZE_BOOST;
+          for (let i = offset; i < offset + count; i += 1) {
+            current.sizes[i] = current.baseSizes[i] * boost;
+          }
+        } else if (charFlash[c] !== 0) {
+          charFlash[c] = 0;
+          sizesDirty = true;
+          for (let i = offset; i < offset + count; i += 1) {
+            current.sizes[i] = current.baseSizes[i];
+          }
+        }
+      }
+    }
+
+    if (sizesDirty) {
+      const sizeAttribute = geometry.getAttribute("aSize") as BufferAttribute;
+      sizeAttribute.needsUpdate = true;
+    }
+
     if (glowMaterialRef.current) {
-      glowMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      glowMaterialRef.current.uniforms.uTime.value = t;
       glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
       glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
       glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
@@ -840,13 +921,20 @@ function CountdownDigitGroup({
     }
 
     if (coreMaterialRef.current) {
-      coreMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      coreMaterialRef.current.uniforms.uTime.value = t;
       coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
       coreMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
       coreMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
       coreMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
       coreMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
     }
+
+    if (settleCompleteRef.current && !flashActive) {
+      return;
+    }
+
+    const settleThreshold = 0.0003;
+    let maxDelta = 0;
 
     for (let i = 0; i < current.count; i += 1) {
       const offset = i * 3;
@@ -868,25 +956,34 @@ function CountdownDigitGroup({
           const inverse = 1 / Math.max(distance, 0.0001);
           desiredX += dx * inverse * influence * repelStrength;
           desiredY += dy * inverse * influence * repelStrength;
-          desiredZ += (hash01(i * 19 + state.clock.elapsedTime * 2.5) - 0.5) * influence * 0.05;
+          desiredZ += (hash01(i * 19 + t * 2.5) - 0.5) * influence * 0.05;
         }
       }
 
-      current.positions[offset] = MathUtils.lerp(current.positions[offset], desiredX, settle);
-      current.positions[offset + 1] = MathUtils.lerp(
-        current.positions[offset + 1],
-        desiredY,
-        settle
-      );
-      current.positions[offset + 2] = MathUtils.lerp(
-        current.positions[offset + 2],
-        desiredZ,
-        settle
+      const personalSettle = settle * (0.7 + hash01(i * 37 + 131) * 0.6);
+
+      const nx = MathUtils.lerp(current.positions[offset], desiredX, personalSettle);
+      const ny = MathUtils.lerp(current.positions[offset + 1], desiredY, personalSettle);
+      const nz = MathUtils.lerp(current.positions[offset + 2], desiredZ, personalSettle);
+
+      current.positions[offset] = nx;
+      current.positions[offset + 1] = ny;
+      current.positions[offset + 2] = nz;
+
+      maxDelta = Math.max(
+        maxDelta,
+        Math.abs(nx - desiredX),
+        Math.abs(ny - desiredY),
+        Math.abs(nz - desiredZ)
       );
     }
 
     if (positionAttributeRef.current) {
       positionAttributeRef.current.needsUpdate = true;
+    }
+
+    if (!pointerActive.current && maxDelta < settleThreshold && !flashActive) {
+      settleCompleteRef.current = true;
     }
   });
 
@@ -908,6 +1005,8 @@ function CountdownDigitGroup({
             uSoftness: { value: 1 },
             uGlowInner: { value: 0.05 },
             uGlowOuter: { value: 0.5 },
+            uTwinkle: { value: 0.07 },
+            uTintColor: { value: [0.93, 0.97, 1] },
             uSceneWidth: { value: settings.sceneWidth },
             uSceneHeight: { value: settings.sceneHeight },
             uWaveXFrequency: { value: waveXFrequency },
@@ -932,6 +1031,8 @@ function CountdownDigitGroup({
             uSoftness: { value: 0 },
             uGlowInner: { value: 0.14 },
             uGlowOuter: { value: 0.5 },
+            uTwinkle: { value: 0.03 },
+            uTintColor: { value: [1, 1, 1] },
             uSceneWidth: { value: settings.sceneWidth },
             uSceneHeight: { value: settings.sceneHeight },
             uWaveXFrequency: { value: waveXFrequency },
