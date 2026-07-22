@@ -56,6 +56,7 @@ type CountdownSettings = {
 
 type ParticleSystem = {
   positions: Float32Array;
+  velocities: Float32Array;
   basePositions: Float32Array;
   colors: Float32Array;
   sizes: Float32Array;
@@ -502,6 +503,16 @@ function drawLabelPoints(
 const LABEL_SIZE_SCALE = 0.55;
 const FLASH_SIZE_BOOST = 0.55;
 
+// Damped-spring constants for how a dot returns to rest after being
+// repelled or reassigned to a new target. Higher stiffness pulls harder;
+// higher damping resists faster, cutting down overshoot. The ratio between
+// them controls the "bounce" — see the useFrame loop below.
+const SPRING_STIFFNESS = 170;
+const SPRING_DAMPING = 19;
+const SPRING_STIFFNESS_REDUCED = 90;
+const SPRING_DAMPING_REDUCED = 28;
+const MAX_SPRING_DT = 1 / 30;
+
 const PALETTE_RGB = PALETTE.map(
   (hex) =>
     [
@@ -738,6 +749,7 @@ function CountdownDigitGroup({
     }
 
     const positions = new Float32Array(poolSize * 3);
+    const velocities = new Float32Array(poolSize * 3);
     const basePositions = new Float32Array(poolSize * 3);
     const colors = new Float32Array(poolSize * 3);
     const sizes = new Float32Array(poolSize);
@@ -774,7 +786,7 @@ function CountdownDigitGroup({
     });
 
     positions.set(basePositions);
-    systemRef.current = { positions, basePositions, colors, sizes, baseSizes, count: poolSize };
+    systemRef.current = { positions, velocities, basePositions, colors, sizes, baseSizes, count: poolSize };
     charPoolRef.current = { offsets: charPoolOffsets, sizes: charPoolSizes, chars: chars.slice() };
     charFlashRef.current = chars.map(() => 0);
 
@@ -859,16 +871,18 @@ function CountdownDigitGroup({
     };
   }, [geometry]);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const current = systemRef.current;
     if (!current) {
       return;
     }
+    const dt = Math.min(delta, MAX_SPRING_DT);
     const t = state.clock.elapsedTime;
     const pointer = pointerWorld.current;
-    const repelRadius = reducedMotion ? 0.2 : 0.32;
-    const repelStrength = reducedMotion ? 0.09 : 0.16;
-    const settle = reducedMotion ? 0.1 : 0.16;
+    const repelRadius = reducedMotion ? 0.4 : 0.68;
+    const repelStrength = reducedMotion ? 0.14 : 0.34;
+    const stiffness = reducedMotion ? SPRING_STIFFNESS_REDUCED : SPRING_STIFFNESS;
+    const damping = reducedMotion ? SPRING_DAMPING_REDUCED : SPRING_DAMPING;
 
     if (pointerActive.current) {
       settleCompleteRef.current = false;
@@ -933,14 +947,18 @@ function CountdownDigitGroup({
       return;
     }
 
-    const settleThreshold = 0.0003;
-    let maxDelta = 0;
+    const posThreshold = 0.0003;
+    const velThreshold = 0.02;
+    let maxPosDelta = 0;
+    let maxVel = 0;
 
     for (let i = 0; i < current.count; i += 1) {
       const offset = i * 3;
+      const oy = offset + 1;
+      const oz = offset + 2;
       const baseX = current.basePositions[offset];
-      const baseY = current.basePositions[offset + 1];
-      const baseZ = current.basePositions[offset + 2];
+      const baseY = current.basePositions[oy];
+      const baseZ = current.basePositions[oz];
 
       let desiredX = baseX;
       let desiredY = baseY;
@@ -952,37 +970,53 @@ function CountdownDigitGroup({
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < repelRadius) {
-          const influence = 1 - distance / repelRadius;
+          // Power curve concentrates the push near the cursor itself
+          // rather than spreading it evenly across the whole radius.
+          const influence = Math.pow(1 - distance / repelRadius, 1.4);
           const inverse = 1 / Math.max(distance, 0.0001);
           desiredX += dx * inverse * influence * repelStrength;
           desiredY += dy * inverse * influence * repelStrength;
-          desiredZ += (hash01(i * 19 + t * 2.5) - 0.5) * influence * 0.05;
+          desiredZ += (hash01(i * 19 + t * 2.5) - 0.5) * influence * 0.07;
         }
       }
 
-      const personalSettle = settle * (0.7 + hash01(i * 37 + 131) * 0.6);
+      // Per-particle jitter on the spring constants so the field doesn't
+      // move as one rigid block — some dots pull back slightly quicker or
+      // slower, and settle with a touch more or less bounce.
+      const jitter = 0.85 + hash01(i * 37 + 131) * 0.3;
+      const particleStiffness = stiffness * jitter;
+      const particleDamping = damping * jitter;
 
-      const nx = MathUtils.lerp(current.positions[offset], desiredX, personalSettle);
-      const ny = MathUtils.lerp(current.positions[offset + 1], desiredY, personalSettle);
-      const nz = MathUtils.lerp(current.positions[offset + 2], desiredZ, personalSettle);
+      const ax = (desiredX - current.positions[offset]) * particleStiffness - current.velocities[offset] * particleDamping;
+      const ay = (desiredY - current.positions[oy]) * particleStiffness - current.velocities[oy] * particleDamping;
+      const az = (desiredZ - current.positions[oz]) * particleStiffness - current.velocities[oz] * particleDamping;
 
-      current.positions[offset] = nx;
-      current.positions[offset + 1] = ny;
-      current.positions[offset + 2] = nz;
+      const vx = current.velocities[offset] + ax * dt;
+      const vy = current.velocities[oy] + ay * dt;
+      const vz = current.velocities[oz] + az * dt;
 
-      maxDelta = Math.max(
-        maxDelta,
-        Math.abs(nx - desiredX),
-        Math.abs(ny - desiredY),
-        Math.abs(nz - desiredZ)
+      current.velocities[offset] = vx;
+      current.velocities[oy] = vy;
+      current.velocities[oz] = vz;
+
+      current.positions[offset] += vx * dt;
+      current.positions[oy] += vy * dt;
+      current.positions[oz] += vz * dt;
+
+      maxPosDelta = Math.max(
+        maxPosDelta,
+        Math.abs(desiredX - current.positions[offset]),
+        Math.abs(desiredY - current.positions[oy]),
+        Math.abs(desiredZ - current.positions[oz])
       );
+      maxVel = Math.max(maxVel, Math.abs(vx), Math.abs(vy), Math.abs(vz));
     }
 
     if (positionAttributeRef.current) {
       positionAttributeRef.current.needsUpdate = true;
     }
 
-    if (!pointerActive.current && maxDelta < settleThreshold && !flashActive) {
+    if (!pointerActive.current && maxPosDelta < posThreshold && maxVel < velThreshold && !flashActive) {
       settleCompleteRef.current = true;
     }
   });

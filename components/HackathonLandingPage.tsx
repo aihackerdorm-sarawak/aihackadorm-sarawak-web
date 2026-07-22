@@ -580,8 +580,9 @@ function ScheduleSection() {
       >
         <div className="space-y-6">
           <div className="overflow-x-auto pb-4">
-            <div className="relative min-w-[620px] px-3 py-10">
-              <div className="absolute left-3 right-3 top-1/2 h-px -translate-y-1/2 bg-white/15" />
+            <div className="relative min-w-[620px] px-3 pt-2">
+              {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
+              <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />
               <div className="grid grid-cols-3 gap-4">
                 {scheduleItems.map((item) => {
                   const active = item.id === selectedId;
@@ -592,19 +593,9 @@ function ScheduleSection() {
                       type="button"
                       onClick={() => setSelectedId(item.id)}
                       aria-pressed={active}
-                      className="relative flex min-h-28 flex-col items-center justify-center text-center"
+                      className="relative flex min-h-32 flex-col items-center gap-3 text-center"
                     >
-                      <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
-                        <span
-                          className={`block h-4 w-4 rounded-full border transition-all ${
-                            active
-                              ? "border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.08)]"
-                              : "border-white/45 bg-[#030303]"
-                          }`}
-                        />
-                      </div>
-
-                      <div className="mb-auto flex flex-col items-center gap-2 px-3">
+                      <div className="flex flex-col items-center gap-2 px-3">
                         <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/45">
                           {item.hint}
                         </p>
@@ -619,6 +610,16 @@ function ScheduleSection() {
                           {item.date}
                         </p>
                       </div>
+
+                      <span className="mt-auto flex h-8 items-center justify-center">
+                        <span
+                          className={`relative z-10 block h-4 w-4 rounded-full border transition-all ${
+                            active
+                              ? "border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.08)]"
+                              : "border-white/45 bg-[#030303]"
+                          }`}
+                        />
+                      </span>
                     </button>
                   );
                 })}
