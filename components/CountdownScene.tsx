@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { AdaptiveDpr, AdaptiveEvents } from "@react-three/drei";
@@ -49,7 +50,6 @@ type CountdownSettings = {
   pointSizeMin: number;
   pointSizeMax: number;
   pointScale: number;
-  jitter: number;
   sampleStride: number;
   maxParticles: number;
 };
@@ -101,13 +101,15 @@ varying vec3 vColor;
 
 uniform float uOpacity;
 uniform float uSoftness;
+uniform float uGlowInner;
+uniform float uGlowOuter;
 
 void main() {
   vec2 uv = gl_PointCoord - vec2(0.5);
   float dist = length(uv);
-  float glow = 1.0 - smoothstep(0.14, 0.5, dist);
+  float glow = 1.0 - smoothstep(uGlowInner, uGlowOuter, dist);
   float core = 1.0 - smoothstep(0.0, 0.42, dist);
-  float alpha = mix(core, core * 0.65 + glow * 0.35, uSoftness);
+  float alpha = mix(core, core * 0.6 + glow * 0.4, uSoftness);
 
   gl_FragColor = vec4(vColor, alpha * uOpacity);
 }
@@ -239,12 +241,11 @@ function getSettings(
       sceneWidth: visibleWidth * layoutScale,
       sceneHeight: visibleHeight * layoutScale,
       sceneOffsetY: stacked ? -0.18 : -0.06,
-      pointSizeMin: 0.03 * viewportScale * particleScale,
+      pointSizeMin: 0.032 * viewportScale * particleScale,
       pointSizeMax: 0.062 * viewportScale * particleScale,
-      pointScale: 4.0 * viewportScale * particleScale,
-      jitter: stacked ? 0.05 : 0.07,
-      sampleStride: stacked ? 4 : 4,
-      maxParticles: stacked ? 8200 : 11800,
+      pointScale: 3.9 * viewportScale * particleScale,
+      sampleStride: stacked ? 8 : 8,
+      maxParticles: stacked ? 4400 : 6200,
     };
   }
 
@@ -257,12 +258,11 @@ function getSettings(
       sceneWidth: visibleWidth * layoutScale,
       sceneHeight: visibleHeight * layoutScale,
       sceneOffsetY: stacked ? -0.17 : -0.06,
-      pointSizeMin: 0.024 * viewportScale * particleScale,
+      pointSizeMin: 0.026 * viewportScale * particleScale,
       pointSizeMax: 0.05 * viewportScale * particleScale,
       pointScale: 3.1 * viewportScale * particleScale,
-      jitter: stacked ? 0.04 : 0.06,
-      sampleStride: stacked ? 5 : 5,
-      maxParticles: stacked ? 6200 : 8600,
+      sampleStride: stacked ? 10 : 10,
+      maxParticles: stacked ? 2600 : 3600,
     };
   }
 
@@ -274,12 +274,11 @@ function getSettings(
     sceneWidth: visibleWidth * layoutScale,
     sceneHeight: visibleHeight * layoutScale,
     sceneOffsetY: stacked ? -0.16 : -0.06,
-    pointSizeMin: 0.027 * viewportScale * particleScale,
+    pointSizeMin: 0.029 * viewportScale * particleScale,
     pointSizeMax: 0.056 * viewportScale * particleScale,
-    pointScale: 3.45 * viewportScale * particleScale,
-    jitter: stacked ? 0.045 : 0.065,
-    sampleStride: stacked ? 4 : 4,
-    maxParticles: stacked ? 7000 : 9800,
+    pointScale: 3.5 * viewportScale * particleScale,
+    sampleStride: stacked ? 8 : 8,
+    maxParticles: stacked ? 3700 : 5200,
   };
 }
 
@@ -301,188 +300,600 @@ function reduceSamplePoints(points: SamplePoint[], maxParticles: number) {
   return reduced;
 }
 
-function drawCountdownCanvas(
-  countdown: CountdownValue,
+const SEGMENT_LABELS = ["DAYS", "HOURS", "MINS", "SECS"] as const;
+
+type FontSizes = {
+  valueFont: number;
+  labelFont: number;
+};
+
+type SegmentLayout = {
+  originX: number;
+  originY: number;
+  width: number;
+  height: number;
+};
+
+function getSegmentLayout(
+  index: number,
   stacked: boolean,
   settings: CountdownSettings
-) {
-  const canvas = document.createElement("canvas");
-  canvas.width = settings.canvasWidth;
-  canvas.height = settings.canvasHeight;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return [] as SamplePoint[];
+): SegmentLayout {
+  if (stacked) {
+    const rowHeight = settings.canvasHeight / 4;
+    return { originX: 0, originY: index * rowHeight, width: settings.canvasWidth, height: rowHeight };
   }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const values = [countdown.days, countdown.hours, countdown.minutes, countdown.seconds];
-  const labels = ["DAYS", "HOURS", "MINS", "SECS"];
+  const gap = settings.canvasWidth * 0.012;
+  const cardWidth = (settings.canvasWidth - gap * 3) / 4;
+  return {
+    originX: cardWidth * index + gap * index,
+    originY: 0,
+    width: cardWidth,
+    height: settings.canvasHeight,
+  };
+}
+
+function computeFontSizes(
+  ctx: CanvasRenderingContext2D,
+  values: readonly string[],
+  stacked: boolean,
+  settings: CountdownSettings
+): FontSizes {
+  const longestValue = values.reduce(
+    (longest, value) => (value.length > longest.length ? value : longest),
+    values[0]
+  );
 
   if (stacked) {
-    // Divide into 4 perfect horizontal row blocks
-    const rowHeight = canvas.height / 4;
-
-    // Restrict max dimensions so the font scales properly inside the 3D space
-    const maxTextWidth = canvas.width * 0.60; 
-    const maxTextHeight = rowHeight * 0.45; 
+    const rowHeight = settings.canvasHeight / 4;
+    const maxTextWidth = settings.canvasWidth * 0.6;
+    const maxTextHeight = rowHeight * 0.45;
 
     const valueFont = fitTextFontSize(
       ctx,
-      values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
+      longestValue,
       maxTextWidth,
       maxTextHeight,
-      48, 
+      48,
       Math.max(90, Math.round(settings.fontSize * 1.1))
     );
-    
-    const labelFont = fitTextFontSize(
-      ctx, 
-      "HOURS", 
-      canvas.width * 0.40, 
-      rowHeight * 0.15, 
-      16, 
-      36
-    );
+    const labelFont = fitTextFontSize(ctx, "HOURS", settings.canvasWidth * 0.4, rowHeight * 0.15, 16, 36);
 
-    values.forEach((value, index) => {
-      const rowTop = index * rowHeight;
-
-      // Force a physical gap: Number is near the top (38%), label is at the bottom (80%)
-      const valueY = rowTop + (rowHeight * 0.38);
-      const labelY = rowTop + (rowHeight * 0.80);
-
-      ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(value, canvas.width / 2, valueY);
-
-      ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(labels[index], canvas.width / 2, labelY);
-    });
-  } else {
-    // Desktop layout remains exactly the same
-    const gap = canvas.width * 0.012;
-    const cardWidth = (canvas.width - gap * 3) / 4;
-    const cardTop = canvas.height * 0.05;
-    const cardHeight = canvas.height * 0.8;
-    const valueFont = fitTextFontSize(
-      ctx,
-      values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
-      cardWidth * 0.9,
-      cardHeight * 0.6,
-      90,
-      Math.max(144, Math.round(settings.fontSize * 1.3))
-    );
-    const labelFont = fitTextFontSize(ctx, "HOURS", cardWidth * 0.64, cardHeight * 0.22, 20, 42);
-
-    values.forEach((value, index) => {
-      const centerX = cardWidth * (index + 0.5) + gap * index;
-      const valueY = cardTop + cardHeight * 0.45;
-      const labelY = cardTop + cardHeight * 0.8;
-
-      ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(value, centerX, valueY);
-
-      ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(labels[index], centerX, labelY);
-    });
+    return { valueFont, labelFont };
   }
 
-  const stride = settings.sampleStride;
-  const image = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const gap = settings.canvasWidth * 0.012;
+  const cardWidth = (settings.canvasWidth - gap * 3) / 4;
+  const cardHeight = settings.canvasHeight * 0.8;
+
+  const valueFont = fitTextFontSize(
+    ctx,
+    longestValue,
+    cardWidth * 0.9,
+    cardHeight * 0.6,
+    90,
+    Math.max(144, Math.round(settings.fontSize * 1.3))
+  );
+  const labelFont = fitTextFontSize(ctx, "HOURS", cardWidth * 0.64, cardHeight * 0.22, 20, 42);
+
+  return { valueFont, labelFont };
+}
+
+function sampleCanvasPoints(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  stride: number,
+  layout: SegmentLayout
+): SamplePoint[] {
+  const image = ctx.getImageData(0, 0, width, height).data;
   const points: SamplePoint[] = [];
 
-  for (let y = 0; y < canvas.height; y += stride) {
-    for (let x = 0; x < canvas.width; x += stride) {
-      const index = (y * canvas.width + x) * 4;
-      const alpha = image[index + 3];
+  for (let y = 0; y < height; y += stride) {
+    for (let x = 0; x < width; x += stride) {
+      const pixelIndex = (y * width + x) * 4;
+      const alpha = image[pixelIndex + 3];
 
       if (alpha > 12) {
-        points.push({ x, y, alpha });
+        points.push({ x: layout.originX + x, y: layout.originY + y, alpha });
       }
     }
   }
 
-  return reduceSamplePoints(points, settings.maxParticles);
+  return points;
 }
 
-function createParticleSystem(
-  points: SamplePoint[],
-  settings: CountdownSettings
-): ParticleSystem {
-  const count = Math.max(points.length, 1);
-  const positions = new Float32Array(count * 3);
-  const basePositions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
+function drawValuePoints(
+  value: string,
+  index: number,
+  stacked: boolean,
+  settings: CountdownSettings,
+  valueFont: number
+): SamplePoint[] {
+  const layout = getSegmentLayout(index, stacked, settings);
+  const width = Math.max(1, Math.ceil(layout.width));
+  const height = Math.max(1, Math.ceil(layout.height));
 
-  const width = settings.canvasWidth;
-  const height = settings.canvasHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
 
-  for (let index = 0; index < count; index += 1) {
-    const point = points[index] ?? {
-      x: width / 2,
-      y: height / 2,
-      alpha: 255,
-    };
-    const seed = index * 997 + point.x * 31 + point.y * 17;
-    const normalizedX = point.x / width;
-    const normalizedY = point.y / height;
-    const alpha = point.alpha / 255;
-    const density = Math.min(1, Math.max(0, alpha));
-    const centerWeight = 1 - Math.min(1, Math.abs(normalizedX - 0.5) * 1.5 + Math.abs(normalizedY - 0.5) * 0.8);
-
-    const baseX = (normalizedX - 0.5) * settings.sceneWidth;
-    const baseY = (0.5 - normalizedY) * settings.sceneHeight + settings.sceneOffsetY;
-    const baseZ = (hash01(seed + 19) - 0.5) * 0.06;
-
-    const jitterX = (hash01(seed) - 0.5) * settings.jitter;
-    const jitterY = (hash01(seed + 7) - 0.5) * settings.jitter;
-    const jitterZ = (hash01(seed + 13) - 0.5) * 0.04;
-
-    const offset = index * 3;
-    basePositions[offset] = baseX;
-    basePositions[offset + 1] = baseY;
-    basePositions[offset + 2] = baseZ;
-
-    positions[offset] = baseX + jitterX;
-    positions[offset + 1] = baseY + jitterY;
-    positions[offset + 2] = baseZ + jitterZ;
-
-    const toneRoll = hash01(seed + 23);
-    const tone =
-      density > 0.72 || centerWeight > 0.55
-        ? PALETTE[0]
-        : toneRoll > 0.55
-          ? PALETTE[1]
-          : PALETTE[2];
-    const rgb = {
-      r: Number.parseInt(tone.slice(1, 3), 16),
-      g: Number.parseInt(tone.slice(3, 5), 16),
-      b: Number.parseInt(tone.slice(5, 7), 16),
-    };
-
-    colors[offset] = rgb.r / 255;
-    colors[offset + 1] = rgb.g / 255;
-    colors[offset + 2] = rgb.b / 255;
-    sizes[index] =
-      settings.pointSizeMin +
-      density * (settings.pointSizeMax - settings.pointSizeMin) +
-      (hash01(seed + 41) - 0.5) * 0.0035;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return [];
   }
 
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
+
+  const valueY = stacked
+    ? height * 0.38
+    : settings.canvasHeight * 0.05 + settings.canvasHeight * 0.8 * 0.45;
+  ctx.fillText(value, width / 2, valueY);
+
+  return sampleCanvasPoints(ctx, width, height, settings.sampleStride, layout);
+}
+
+function drawLabelPoints(
+  label: string,
+  index: number,
+  stacked: boolean,
+  settings: CountdownSettings,
+  labelFont: number
+): SamplePoint[] {
+  const layout = getSegmentLayout(index, stacked, settings);
+  const width = Math.max(1, Math.ceil(layout.width));
+  const height = Math.max(1, Math.ceil(layout.height));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return [];
+  }
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
+
+  const labelY = stacked
+    ? height * 0.8
+    : settings.canvasHeight * 0.05 + settings.canvasHeight * 0.8 * 0.8;
+  ctx.fillText(label, width / 2, labelY);
+
+  const labelStride = Math.max(2, Math.round(settings.sampleStride * 0.45));
+  return sampleCanvasPoints(ctx, width, height, labelStride, layout);
+}
+
+const LABEL_SIZE_SCALE = 0.55;
+
+const PALETTE_RGB = PALETTE.map(
+  (hex) =>
+    [
+      Number.parseInt(hex.slice(1, 3), 16) / 255,
+      Number.parseInt(hex.slice(3, 5), 16) / 255,
+      Number.parseInt(hex.slice(5, 7), 16) / 255,
+    ] as const
+);
+
+type Target = {
+  x: number;
+  y: number;
+  z: number;
+  density: number;
+  tone: readonly [number, number, number];
+};
+
+function buildTarget(point: SamplePoint, settings: CountdownSettings): Target {
+  const width = settings.canvasWidth;
+  const height = settings.canvasHeight;
+  const normalizedX = point.x / width;
+  const normalizedY = point.y / height;
+  const density = Math.min(1, Math.max(0, point.alpha / 255));
+  const centerWeight =
+    1 - Math.min(1, Math.abs(normalizedX - 0.5) * 1.5 + Math.abs(normalizedY - 0.5) * 0.8);
+
+  // Seeded from pixel location (not particle index) so tone/depth stay
+  // stable for a given screen position regardless of which particle
+  // ends up occupying it after nearest-neighbor reassignment.
+  const seed = point.x * 131 + point.y * 977;
+  const toneRoll = hash01(seed + 23);
+  const toneIndex = density > 0.72 || centerWeight > 0.55 ? 0 : toneRoll > 0.55 ? 1 : 2;
+
   return {
-    positions,
-    basePositions,
-    colors,
-    sizes,
-    count,
+    x: (normalizedX - 0.5) * settings.sceneWidth,
+    y: (0.5 - normalizedY) * settings.sceneHeight + settings.sceneOffsetY,
+    z: (hash01(seed + 19) - 0.5) * 0.02,
+    density,
+    tone: PALETTE_RGB[toneIndex],
   };
 }
 
-function CountdownParticles({
+function writeTargetIntoArrays(
+  target: Target,
+  settings: CountdownSettings,
+  sizeScale: number,
+  poolIndex: number,
+  basePositions: Float32Array,
+  colors: Float32Array,
+  sizes: Float32Array
+) {
+  const offset = poolIndex * 3;
+  basePositions[offset] = target.x;
+  basePositions[offset + 1] = target.y;
+  basePositions[offset + 2] = target.z;
+
+  colors[offset] = target.tone[0];
+  colors[offset + 1] = target.tone[1];
+  colors[offset + 2] = target.tone[2];
+
+  sizes[poolIndex] =
+    (settings.pointSizeMin + target.density * (settings.pointSizeMax - settings.pointSizeMin)) * sizeScale;
+}
+
+// Greedy nearest-neighbor matching: each pooled particle claims the closest
+// still-unclaimed target, using a spatial hash so particles move the least
+// distance necessary to reform the new digit instead of jumping to an
+// arbitrary raster-order slot.
+function assignNearestTargets(
+  currentPositions: Float32Array,
+  poolOffset: number,
+  poolCount: number,
+  targets: Target[],
+  cellSize: number
+): Int32Array {
+  const assignment = new Int32Array(poolCount);
+  const targetCount = targets.length;
+  if (targetCount === 0 || poolCount === 0) {
+    return assignment;
+  }
+
+  const size = Math.max(cellSize, 0.001);
+  const buckets = new Map<string, number[]>();
+  for (let t = 0; t < targetCount; t += 1) {
+    const key = `${Math.floor(targets[t].x / size)},${Math.floor(targets[t].y / size)}`;
+    const bucket = buckets.get(key);
+    if (bucket) {
+      bucket.push(t);
+    } else {
+      buckets.set(key, [t]);
+    }
+  }
+
+  const claimed = new Uint8Array(targetCount);
+  const primaryCount = Math.min(poolCount, targetCount);
+
+  for (let i = 0; i < primaryCount; i += 1) {
+    const offset = (poolOffset + i) * 3;
+    const px = currentPositions[offset];
+    const py = currentPositions[offset + 1];
+    const cx = Math.floor(px / size);
+    const cy = Math.floor(py / size);
+
+    let best = -1;
+    let bestDist = Infinity;
+
+    for (let ring = 0; ring <= 8 && best === -1; ring += 1) {
+      for (let gx = cx - ring; gx <= cx + ring; gx += 1) {
+        for (let gy = cy - ring; gy <= cy + ring; gy += 1) {
+          const bucket = buckets.get(`${gx},${gy}`);
+          if (!bucket) {
+            continue;
+          }
+          for (let b = 0; b < bucket.length; b += 1) {
+            const t = bucket[b];
+            if (claimed[t]) {
+              continue;
+            }
+            const dx = targets[t].x - px;
+            const dy = targets[t].y - py;
+            const dist = dx * dx + dy * dy;
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = t;
+            }
+          }
+        }
+      }
+    }
+
+    if (best === -1) {
+      for (let t = 0; t < targetCount; t += 1) {
+        if (claimed[t]) {
+          continue;
+        }
+        const dx = targets[t].x - px;
+        const dy = targets[t].y - py;
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = t;
+        }
+      }
+    }
+
+    assignment[i] = best === -1 ? 0 : best;
+    if (best !== -1) {
+      claimed[best] = 1;
+    }
+  }
+
+  for (let i = primaryCount; i < poolCount; i += 1) {
+    assignment[i] = i % targetCount;
+  }
+
+  return assignment;
+}
+
+function CountdownDigitGroup({
+  value,
+  label,
+  index,
+  stacked,
+  settings,
+  sceneOffsetY,
+  valueFont,
+  labelFont,
+  waveXFrequency,
+  waveYFrequency,
+  reducedMotion,
+  pointerWorld,
+  pointerActive,
+}: {
+  value: string;
+  label: string;
+  index: number;
+  stacked: boolean;
+  settings: CountdownSettings;
+  sceneOffsetY: number;
+  valueFont: number;
+  labelFont: number;
+  waveXFrequency: number;
+  waveYFrequency: number;
+  reducedMotion: boolean;
+  pointerWorld: MutableRefObject<Vector3>;
+  pointerActive: MutableRefObject<boolean>;
+}) {
+  const [geometry] = useState(() => new BufferGeometry());
+  const positionAttributeRef = useRef<BufferAttribute | null>(null);
+  const glowMaterialRef = useRef<ShaderMaterial>(null!);
+  const coreMaterialRef = useRef<ShaderMaterial>(null!);
+  const systemRef = useRef<ParticleSystem | null>(null);
+  const structuralKeyRef = useRef<string>("");
+  const labelCountRef = useRef(0);
+
+  const poolSize = useMemo(
+    () => Math.max(1, Math.ceil(settings.maxParticles / 4)),
+    [settings.maxParticles]
+  );
+
+  // Structural setup: (re)allocates the pool and samples the label text.
+  // The label never changes for a given segment, so once this has run the
+  // label slots are never touched again outside a real layout change.
+  useEffect(() => {
+    const structuralKey = `${poolSize}|${settings.canvasWidth}|${settings.canvasHeight}|${settings.sceneWidth}|${settings.sceneHeight}|${sceneOffsetY}|${stacked}|${labelFont}`;
+    if (systemRef.current && structuralKeyRef.current === structuralKey) {
+      return;
+    }
+    structuralKeyRef.current = structuralKey;
+
+    const settingsWithOffset = { ...settings, sceneOffsetY };
+    const labelPoints = drawLabelPoints(label, index, stacked, settings, labelFont);
+    const labelTargets = labelPoints.map((point) => buildTarget(point, settingsWithOffset));
+    const labelCount = Math.min(labelTargets.length, poolSize - 1);
+    labelCountRef.current = labelCount;
+
+    const valuePoolSize = Math.max(1, poolSize - labelCount);
+    const valuePoints = drawValuePoints(value, index, stacked, settings, valueFont);
+    const valueTargets = reduceSamplePoints(valuePoints, valuePoolSize).map((point) =>
+      buildTarget(point, settingsWithOffset)
+    );
+
+    const positions = new Float32Array(poolSize * 3);
+    const basePositions = new Float32Array(poolSize * 3);
+    const colors = new Float32Array(poolSize * 3);
+    const sizes = new Float32Array(poolSize);
+
+    for (let i = 0; i < labelCount; i += 1) {
+      writeTargetIntoArrays(labelTargets[i], settings, LABEL_SIZE_SCALE, i, basePositions, colors, sizes);
+    }
+
+    const valueSampleCount = Math.max(1, valueTargets.length);
+    for (let i = 0; i < valuePoolSize; i += 1) {
+      const target = valueTargets[i % valueSampleCount];
+      writeTargetIntoArrays(target, settings, 1, labelCount + i, basePositions, colors, sizes);
+    }
+
+    positions.set(basePositions);
+    systemRef.current = { positions, basePositions, colors, sizes, count: poolSize };
+
+    geometry.setAttribute("position", new BufferAttribute(positions, 3));
+    geometry.setAttribute("aColor", new BufferAttribute(colors, 3));
+    geometry.setAttribute("aSize", new BufferAttribute(sizes, 1));
+    positionAttributeRef.current = geometry.getAttribute("position") as BufferAttribute;
+    geometry.computeBoundingSphere();
+  }, [poolSize, settings, sceneOffsetY, stacked, labelFont, label, index, value, valueFont, geometry]);
+
+  // Digit ticks: only reassign the value slots, matching each pooled
+  // particle to its nearest new target so dots slide the shortest distance
+  // to reform the new digit instead of popping to an arbitrary slot.
+  useEffect(() => {
+    const system = systemRef.current;
+    if (!system) {
+      return;
+    }
+
+    const labelCount = labelCountRef.current;
+    const valuePoolSize = Math.max(1, poolSize - labelCount);
+    const settingsWithOffset = { ...settings, sceneOffsetY };
+
+    const valuePoints = drawValuePoints(value, index, stacked, settings, valueFont);
+    const valueTargets = reduceSamplePoints(valuePoints, valuePoolSize).map((point) =>
+      buildTarget(point, settingsWithOffset)
+    );
+    if (valueTargets.length === 0) {
+      return;
+    }
+
+    const worldStride = (settings.sceneWidth / settings.canvasWidth) * settings.sampleStride;
+    const cellSize = Math.max(worldStride * 1.5, 0.01);
+    const assignment = assignNearestTargets(
+      system.positions,
+      labelCount,
+      valuePoolSize,
+      valueTargets,
+      cellSize
+    );
+
+    for (let i = 0; i < valuePoolSize; i += 1) {
+      const target = valueTargets[assignment[i]];
+      writeTargetIntoArrays(target, settings, 1, labelCount + i, system.basePositions, system.colors, system.sizes);
+    }
+
+    const colorAttribute = geometry.getAttribute("aColor") as BufferAttribute;
+    const sizeAttribute = geometry.getAttribute("aSize") as BufferAttribute;
+    colorAttribute.needsUpdate = true;
+    sizeAttribute.needsUpdate = true;
+  }, [value, index, stacked, settings, sceneOffsetY, valueFont, poolSize, geometry]);
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
+  useFrame((state) => {
+    const current = systemRef.current;
+    if (!current) {
+      return;
+    }
+    const pointer = pointerWorld.current;
+    const repelRadius = reducedMotion ? 0.2 : 0.32;
+    const repelStrength = reducedMotion ? 0.09 : 0.16;
+    const settle = reducedMotion ? 0.1 : 0.16;
+
+    if (glowMaterialRef.current) {
+      glowMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
+      glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
+      glowMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
+      glowMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
+    }
+
+    if (coreMaterialRef.current) {
+      coreMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      coreMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
+      coreMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
+      coreMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
+      coreMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
+    }
+
+    for (let i = 0; i < current.count; i += 1) {
+      const offset = i * 3;
+      const baseX = current.basePositions[offset];
+      const baseY = current.basePositions[offset + 1];
+      const baseZ = current.basePositions[offset + 2];
+
+      let desiredX = baseX;
+      let desiredY = baseY;
+      let desiredZ = baseZ;
+
+      if (pointerActive.current) {
+        const dx = baseX - pointer.x;
+        const dy = baseY - pointer.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < repelRadius) {
+          const influence = 1 - distance / repelRadius;
+          const inverse = 1 / Math.max(distance, 0.0001);
+          desiredX += dx * inverse * influence * repelStrength;
+          desiredY += dy * inverse * influence * repelStrength;
+          desiredZ += (hash01(i * 19 + state.clock.elapsedTime * 2.5) - 0.5) * influence * 0.05;
+        }
+      }
+
+      current.positions[offset] = MathUtils.lerp(current.positions[offset], desiredX, settle);
+      current.positions[offset + 1] = MathUtils.lerp(
+        current.positions[offset + 1],
+        desiredY,
+        settle
+      );
+      current.positions[offset + 2] = MathUtils.lerp(
+        current.positions[offset + 2],
+        desiredZ,
+        settle
+      );
+    }
+
+    if (positionAttributeRef.current) {
+      positionAttributeRef.current.needsUpdate = true;
+    }
+  });
+
+  return (
+    <group>
+      <points geometry={geometry} renderOrder={2}>
+        <shaderMaterial
+          ref={glowMaterialRef}
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          transparent
+          depthWrite={false}
+          blending={AdditiveBlending}
+          uniforms={{
+            uTime: { value: 0 },
+            uPointScale: { value: settings.pointScale },
+            uLayerScale: { value: 1.9 },
+            uOpacity: { value: 0.32 },
+            uSoftness: { value: 1 },
+            uGlowInner: { value: 0.05 },
+            uGlowOuter: { value: 0.5 },
+            uSceneWidth: { value: settings.sceneWidth },
+            uSceneHeight: { value: settings.sceneHeight },
+            uWaveXFrequency: { value: waveXFrequency },
+            uWaveYFrequency: { value: waveYFrequency },
+          }}
+        />
+      </points>
+
+      <points geometry={geometry} renderOrder={3}>
+        <shaderMaterial
+          ref={coreMaterialRef}
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          transparent
+          depthWrite={false}
+          blending={AdditiveBlending}
+          uniforms={{
+            uTime: { value: 0 },
+            uPointScale: { value: settings.pointScale },
+            uLayerScale: { value: 0.88 },
+            uOpacity: { value: 0.96 },
+            uSoftness: { value: 0 },
+            uGlowInner: { value: 0.14 },
+            uGlowOuter: { value: 0.5 },
+            uSceneWidth: { value: settings.sceneWidth },
+            uSceneHeight: { value: settings.sceneHeight },
+            uWaveXFrequency: { value: waveXFrequency },
+            uWaveYFrequency: { value: waveYFrequency },
+          }}
+        />
+      </points>
+    </group>
+  );
+}
+
+function CountdownDigits({
   reducedMotion,
   quality,
   headerHeightPx,
@@ -497,10 +908,6 @@ function CountdownParticles({
   containerHeightPx: number;
   countdown: CountdownValue;
 }) {
-  const [geometry] = useState(() => new BufferGeometry());
-  const positionAttributeRef = useRef<BufferAttribute | null>(null);
-  const glowMaterialRef = useRef<ShaderMaterial>(null!);
-  const coreMaterialRef = useRef<ShaderMaterial>(null!);
   const pointerActive = useRef(false);
   const viewportWidth = useViewportWidth();
   const viewportHeight = useViewportHeight();
@@ -532,15 +939,6 @@ function CountdownParticles({
     );
     return settings.sceneOffsetY - headerWorldHeight * 0.08;
   }, [cameraViewportHeight, headerHeightPx, settings.sceneOffsetY, viewportHeight]);
-  const sampledPoints = useMemo(
-    () => drawCountdownCanvas(countdown, stacked, settings),
-    [countdown, settings, stacked]
-  );
-  const system = useMemo(
-    () => createParticleSystem(sampledPoints, { ...settings, sceneOffsetY }),
-    [sampledPoints, sceneOffsetY, settings]
-  );
-  const systemRef = useRef(system);
   const pointerWorld = useRef(new Vector3(0, 0, 0));
   const pointerDebugCount = useRef(0);
   const hitPlaneScale = useMemo(
@@ -556,89 +954,24 @@ function CountdownParticles({
     [settings.sceneHeight]
   );
 
-  useEffect(() => {
-    systemRef.current = system;
-    geometry.setAttribute("position", new BufferAttribute(system.positions, 3));
-    geometry.setAttribute("aColor", new BufferAttribute(system.colors, 3));
-    geometry.setAttribute("aSize", new BufferAttribute(system.sizes, 1));
-    positionAttributeRef.current = geometry.getAttribute("position") as BufferAttribute;
-    geometry.computeBoundingSphere();
-  }, [geometry, system]);
+  const [measureCtx] = useState<CanvasRenderingContext2D | null>(() =>
+    typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d")
+  );
 
-  useEffect(() => {
-    return () => {
-      geometry.dispose();
-    };
-  }, [geometry]);
+  const values = useMemo(
+    () => [countdown.days, countdown.hours, countdown.minutes, countdown.seconds] as const,
+    [countdown.days, countdown.hours, countdown.minutes, countdown.seconds]
+  );
+
+  const fonts = useMemo(() => {
+    if (!measureCtx) {
+      return { valueFont: settings.fontSize, labelFont: 28 };
+    }
+    return computeFontSizes(measureCtx, values, stacked, settings);
+  }, [measureCtx, values, stacked, settings]);
 
   useFrame((state) => {
-    const current = systemRef.current;
-    const pointer = pointerWorld.current;
-    const repelRadius = reducedMotion ? 0.2 : 0.32;
-    const repelStrength = reducedMotion ? 0.09 : 0.16;
-    const settle = reducedMotion ? 0.08 : 0.14;
-
-    if (glowMaterialRef.current) {
-      glowMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
-      glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
-      glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
-      glowMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
-      glowMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
-    }
-
-    if (coreMaterialRef.current) {
-      coreMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
-      coreMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
-      coreMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
-      coreMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
-      coreMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
-    }
-
     state.camera.position.z = MathUtils.lerp(state.camera.position.z, cameraZ, 0.06);
-
-    for (let index = 0; index < current.count; index += 1) {
-      const offset = index * 3;
-      const baseX = current.basePositions[offset];
-      const baseY = current.basePositions[offset + 1];
-      const baseZ = current.basePositions[offset + 2];
-
-      let desiredX = baseX;
-      let desiredY = baseY;
-      let desiredZ = baseZ;
-
-      if (pointerActive.current) {
-        const dx = baseX - pointer.x;
-        const dy = baseY - pointer.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < repelRadius) {
-          const influence = 1 - distance / repelRadius;
-          const inverse = 1 / Math.max(distance, 0.0001);
-          desiredX += dx * inverse * influence * repelStrength;
-          desiredY += dy * inverse * influence * repelStrength;
-          desiredZ +=
-            (hash01(index * 19 + state.clock.elapsedTime * 2.5) - 0.5) * influence * 0.05;
-        }
-      }
-
-      current.positions[offset] = MathUtils.lerp(current.positions[offset], desiredX, settle);
-      current.positions[offset + 1] = MathUtils.lerp(
-        current.positions[offset + 1],
-        desiredY,
-        settle
-      );
-      current.positions[offset + 2] = MathUtils.lerp(
-        current.positions[offset + 2],
-        desiredZ,
-        settle
-      );
-    }
-
-    if (positionAttributeRef.current) {
-      positionAttributeRef.current.needsUpdate = true;
-    }
   });
 
   const handlePointerMove = (event: ThreeEvent<PointerEvent>) => {
@@ -672,49 +1005,24 @@ function CountdownParticles({
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      <points geometry={geometry} renderOrder={2}>
-        <shaderMaterial
-          ref={glowMaterialRef}
-          vertexShader={vertexShader}
-          fragmentShader={fragmentShader}
-          transparent
-          depthWrite={false}
-          blending={AdditiveBlending}
-          uniforms={{
-            uTime: { value: 0 },
-            uPointScale: { value: settings.pointScale },
-            uLayerScale: { value: 1.55 },
-            uOpacity: { value: 0.3 },
-            uSoftness: { value: 1 },
-            uSceneWidth: { value: settings.sceneWidth },
-            uSceneHeight: { value: settings.sceneHeight },
-            uWaveXFrequency: { value: waveXFrequency },
-            uWaveYFrequency: { value: waveYFrequency },
-          }}
+      {values.map((value, index) => (
+        <CountdownDigitGroup
+          key={index}
+          index={index}
+          value={value}
+          label={SEGMENT_LABELS[index]}
+          stacked={stacked}
+          settings={settings}
+          sceneOffsetY={sceneOffsetY}
+          valueFont={fonts.valueFont}
+          labelFont={fonts.labelFont}
+          waveXFrequency={waveXFrequency}
+          waveYFrequency={waveYFrequency}
+          reducedMotion={reducedMotion}
+          pointerWorld={pointerWorld}
+          pointerActive={pointerActive}
         />
-      </points>
-
-      <points geometry={geometry} renderOrder={3}>
-        <shaderMaterial
-          ref={coreMaterialRef}
-          vertexShader={vertexShader}
-          fragmentShader={fragmentShader}
-          transparent
-          depthWrite={false}
-          blending={AdditiveBlending}
-          uniforms={{
-            uTime: { value: 0 },
-            uPointScale: { value: settings.pointScale },
-            uLayerScale: { value: 0.88 },
-            uOpacity: { value: 0.96 },
-            uSoftness: { value: 0 },
-            uSceneWidth: { value: settings.sceneWidth },
-            uSceneHeight: { value: settings.sceneHeight },
-            uWaveXFrequency: { value: waveXFrequency },
-            uWaveYFrequency: { value: waveYFrequency },
-          }}
-        />
-      </points>
+      ))}
     </group>
   );
 }
@@ -755,7 +1063,7 @@ export function CountdownScene({
       <directionalLight position={[-4, -2, -4]} intensity={0.55} color="#b9b9b9" />
       <AdaptiveDpr pixelated={quality === "low"} />
       <AdaptiveEvents />
-      <CountdownParticles
+      <CountdownDigits
         reducedMotion={reducedMotion}
         quality={quality}
         headerHeightPx={headerHeightPx}
