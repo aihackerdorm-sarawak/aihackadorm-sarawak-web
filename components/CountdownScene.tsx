@@ -227,7 +227,7 @@ function getSettings(
   const visibleHeight = 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360);
   const aspect = measuredWidth / measuredHeight;
   const visibleWidth = visibleHeight * aspect;
-  const layoutScale = stacked ? 1.42 : quality === "high" ? 1.56 : quality === "medium" ? 1.48 : 1.36;
+  const layoutScale = stacked ? 0.85 : 0.90;
   const particleScale = quality === "high" ? 1.02 : quality === "medium" ? 0.98 : 0.94;
 
   if (quality === "high") {
@@ -323,28 +323,46 @@ function drawCountdownCanvas(
   const labels = ["DAYS", "HOURS", "MINS", "SECS"];
 
   if (stacked) {
-    const rowCenters = [0.18, 0.42, 0.66, 0.9];
+    // Divide into 4 perfect horizontal row blocks
     const rowHeight = canvas.height / 4;
+
+    // Restrict max dimensions so the font scales properly inside the 3D space
+    const maxTextWidth = canvas.width * 0.60; 
+    const maxTextHeight = rowHeight * 0.45; 
+
     const valueFont = fitTextFontSize(
       ctx,
       values.reduce((longest, value) => (value.length > longest.length ? value : longest), values[0]),
-      canvas.width * 0.86,
-      rowHeight * 0.62,
-      72,
-      Math.max(122, Math.round(settings.fontSize * 1.24))
+      maxTextWidth,
+      maxTextHeight,
+      48, 
+      Math.max(90, Math.round(settings.fontSize * 1.1))
     );
-    const labelFont = fitTextFontSize(ctx, "HOURS", canvas.width * 0.6, rowHeight * 0.22, 20, 42);
+    
+    const labelFont = fitTextFontSize(
+      ctx, 
+      "HOURS", 
+      canvas.width * 0.40, 
+      rowHeight * 0.15, 
+      16, 
+      36
+    );
 
     values.forEach((value, index) => {
-      const centerY = canvas.height * rowCenters[index];
+      const rowTop = index * rowHeight;
+
+      // Force a physical gap: Number is near the top (38%), label is at the bottom (80%)
+      const valueY = rowTop + (rowHeight * 0.38);
+      const labelY = rowTop + (rowHeight * 0.80);
 
       ctx.font = `900 ${valueFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(value, canvas.width / 2, centerY - rowHeight * 0.04);
+      ctx.fillText(value, canvas.width / 2, valueY);
 
       ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
-      ctx.fillText(labels[index], canvas.width / 2, centerY + rowHeight * 0.24);
+      ctx.fillText(labels[index], canvas.width / 2, labelY);
     });
   } else {
+    // Desktop layout remains exactly the same
     const gap = canvas.width * 0.012;
     const cardWidth = (canvas.width - gap * 3) / 4;
     const cardTop = canvas.height * 0.05;
