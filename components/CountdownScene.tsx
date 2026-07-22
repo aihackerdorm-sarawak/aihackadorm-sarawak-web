@@ -404,8 +404,14 @@ function sampleCanvasPoints(
   return points;
 }
 
-function drawValuePoints(
-  value: string,
+// Draws a single digit into a fixed horizontal slot (rather than the whole
+// value string centered as one block) so a digit's on-screen anchor never
+// shifts when its neighbor changes shape or width, and so its dots can be
+// sampled/matched completely independently of the other digit(s).
+function drawCharacterPoints(
+  char: string,
+  slotIndex: number,
+  charCount: number,
   index: number,
   stacked: boolean,
   settings: CountdownSettings,
@@ -433,7 +439,18 @@ function drawValuePoints(
   const valueY = stacked
     ? height * 0.38
     : settings.canvasHeight * 0.05 + settings.canvasHeight * 0.8 * 0.45;
-  ctx.fillText(value, width / 2, valueY);
+
+  // Size each digit's slot from the font's own glyph advance width (not the
+  // full segment width divided evenly) so the digits stay tightly grouped
+  // and centered as a pair/trio instead of spreading across the whole
+  // available row — this only depends on font metrics, never on which
+  // specific digit is shown, so the anchor still never shifts on change.
+  const digitWidth = ctx.measureText("0").width;
+  const digitGap = digitWidth * 0.12;
+  const totalWidth = digitWidth * charCount + digitGap * (charCount - 1);
+  const startX = width / 2 - totalWidth / 2;
+  const anchorX = startX + digitWidth / 2 + slotIndex * (digitWidth + digitGap);
+  ctx.fillText(char, anchorX, valueY);
 
   return sampleCanvasPoints(ctx, width, height, settings.sampleStride, layout);
 }
@@ -668,18 +685,21 @@ function CountdownDigitGroup({
   const coreMaterialRef = useRef<ShaderMaterial>(null!);
   const systemRef = useRef<ParticleSystem | null>(null);
   const structuralKeyRef = useRef<string>("");
-  const labelCountRef = useRef(0);
+  const charPoolRef = useRef<{ offsets: number[]; sizes: number[]; chars: string[] } | null>(null);
 
   const poolSize = useMemo(
     () => Math.max(1, Math.ceil(settings.maxParticles / 4)),
     [settings.maxParticles]
   );
 
-  // Structural setup: (re)allocates the pool and samples the label text.
-  // The label never changes for a given segment, so once this has run the
-  // label slots are never touched again outside a real layout change.
+  // Structural setup: (re)allocates the pool, samples the (static) label
+  // text once, and gives each digit position its own reserved slot range
+  // within the pool so a digit's dots can never be matched to a different
+  // digit position's targets.
   useEffect(() => {
-    const structuralKey = `${poolSize}|${settings.canvasWidth}|${settings.canvasHeight}|${settings.sceneWidth}|${settings.sceneHeight}|${sceneOffsetY}|${stacked}|${labelFont}`;
+    const chars = value.split("");
+    const charCount = chars.length;
+    const structuralKey = `${poolSize}|${settings.canvasWidth}|${settings.canvasHeight}|${settings.sceneWidth}|${settings.sceneHeight}|${sceneOffsetY}|${stacked}|${labelFont}|${valueFont}|${charCount}`;
     if (systemRef.current && structuralKeyRef.current === structuralKey) {
       return;
     }
@@ -688,14 +708,19 @@ function CountdownDigitGroup({
     const settingsWithOffset = { ...settings, sceneOffsetY };
     const labelPoints = drawLabelPoints(label, index, stacked, settings, labelFont);
     const labelTargets = labelPoints.map((point) => buildTarget(point, settingsWithOffset));
-    const labelCount = Math.min(labelTargets.length, poolSize - 1);
-    labelCountRef.current = labelCount;
+    const labelCount = Math.min(labelTargets.length, poolSize - charCount);
 
-    const valuePoolSize = Math.max(1, poolSize - labelCount);
-    const valuePoints = drawValuePoints(value, index, stacked, settings, valueFont);
-    const valueTargets = reduceSamplePoints(valuePoints, valuePoolSize).map((point) =>
-      buildTarget(point, settingsWithOffset)
+    const valuePoolSize = Math.max(charCount, poolSize - labelCount);
+    const charPoolSizes = chars.map(
+      (_, i) =>
+        Math.floor(((i + 1) * valuePoolSize) / charCount) - Math.floor((i * valuePoolSize) / charCount)
     );
+    const charPoolOffsets: number[] = [];
+    let offsetAcc = labelCount;
+    for (const size of charPoolSizes) {
+      charPoolOffsets.push(offsetAcc);
+      offsetAcc += size;
+    }
 
     const positions = new Float32Array(poolSize * 3);
     const basePositions = new Float32Array(poolSize * 3);
@@ -706,14 +731,26 @@ function CountdownDigitGroup({
       writeTargetIntoArrays(labelTargets[i], settings, LABEL_SIZE_SCALE, i, basePositions, colors, sizes);
     }
 
-    const valueSampleCount = Math.max(1, valueTargets.length);
-    for (let i = 0; i < valuePoolSize; i += 1) {
-      const target = valueTargets[i % valueSampleCount];
-      writeTargetIntoArrays(target, settings, 1, labelCount + i, basePositions, colors, sizes);
-    }
+    chars.forEach((char, charIndex) => {
+      const charPoolSize = charPoolSizes[charIndex];
+      const charPoints = drawCharacterPoints(char, charIndex, charCount, index, stacked, settings, valueFont);
+      const charTargets = reduceSamplePoints(charPoints, charPoolSize).map((point) =>
+        buildTarget(point, settingsWithOffset)
+      );
+      const sampleCount = charTargets.length;
+
+      for (let i = 0; i < charPoolSize; i += 1) {
+        const target =
+          sampleCount > 0
+            ? charTargets[i % sampleCount]
+            : { x: 0, y: sceneOffsetY, z: 0, density: 0, tone: PALETTE_RGB[2] };
+        writeTargetIntoArrays(target, settings, 1, charPoolOffsets[charIndex] + i, basePositions, colors, sizes);
+      }
+    });
 
     positions.set(basePositions);
     systemRef.current = { positions, basePositions, colors, sizes, count: poolSize };
+    charPoolRef.current = { offsets: charPoolOffsets, sizes: charPoolSizes, chars: chars.slice() };
 
     geometry.setAttribute("position", new BufferAttribute(positions, 3));
     geometry.setAttribute("aColor", new BufferAttribute(colors, 3));
@@ -722,47 +759,60 @@ function CountdownDigitGroup({
     geometry.computeBoundingSphere();
   }, [poolSize, settings, sceneOffsetY, stacked, labelFont, label, index, value, valueFont, geometry]);
 
-  // Digit ticks: only reassign the value slots, matching each pooled
-  // particle to its nearest new target so dots slide the shortest distance
-  // to reform the new digit instead of popping to an arbitrary slot.
+  // Digit ticks: only the digit position(s) whose character actually
+  // changed get resampled and reassigned (nearest-neighbor, within that
+  // digit's own pool range only) — an unchanged digit's dots never move.
   useEffect(() => {
     const system = systemRef.current;
-    if (!system) {
+    const charPool = charPoolRef.current;
+    if (!system || !charPool) {
       return;
     }
 
-    const labelCount = labelCountRef.current;
-    const valuePoolSize = Math.max(1, poolSize - labelCount);
+    const chars = value.split("");
+    if (chars.length !== charPool.chars.length) {
+      return;
+    }
+
     const settingsWithOffset = { ...settings, sceneOffsetY };
-
-    const valuePoints = drawValuePoints(value, index, stacked, settings, valueFont);
-    const valueTargets = reduceSamplePoints(valuePoints, valuePoolSize).map((point) =>
-      buildTarget(point, settingsWithOffset)
-    );
-    if (valueTargets.length === 0) {
-      return;
-    }
-
     const worldStride = (settings.sceneWidth / settings.canvasWidth) * settings.sampleStride;
     const cellSize = Math.max(worldStride * 1.5, 0.01);
-    const assignment = assignNearestTargets(
-      system.positions,
-      labelCount,
-      valuePoolSize,
-      valueTargets,
-      cellSize
-    );
+    let changed = false;
 
-    for (let i = 0; i < valuePoolSize; i += 1) {
-      const target = valueTargets[assignment[i]];
-      writeTargetIntoArrays(target, settings, 1, labelCount + i, system.basePositions, system.colors, system.sizes);
+    chars.forEach((char, charIndex) => {
+      if (char === charPool.chars[charIndex]) {
+        return;
+      }
+      changed = true;
+      charPool.chars[charIndex] = char;
+
+      const poolOffset = charPool.offsets[charIndex];
+      const poolCount = charPool.sizes[charIndex];
+
+      const charPoints = drawCharacterPoints(char, charIndex, chars.length, index, stacked, settings, valueFont);
+      const charTargets = reduceSamplePoints(charPoints, poolCount).map((point) =>
+        buildTarget(point, settingsWithOffset)
+      );
+      if (charTargets.length === 0) {
+        return;
+      }
+
+      const assignment = assignNearestTargets(system.positions, poolOffset, poolCount, charTargets, cellSize);
+      for (let i = 0; i < poolCount; i += 1) {
+        const target = charTargets[assignment[i]];
+        writeTargetIntoArrays(target, settings, 1, poolOffset + i, system.basePositions, system.colors, system.sizes);
+      }
+    });
+
+    if (!changed) {
+      return;
     }
 
     const colorAttribute = geometry.getAttribute("aColor") as BufferAttribute;
     const sizeAttribute = geometry.getAttribute("aSize") as BufferAttribute;
     colorAttribute.needsUpdate = true;
     sizeAttribute.needsUpdate = true;
-  }, [value, index, stacked, settings, sceneOffsetY, valueFont, poolSize, geometry]);
+  }, [value, index, stacked, settings, sceneOffsetY, valueFont, geometry]);
 
   useEffect(() => {
     return () => {
