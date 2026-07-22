@@ -4,7 +4,7 @@ import { Component, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, ExternalLink, Mail, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Mail, Sparkles, Trophy } from "lucide-react";
 import { GraphicsModeProvider, useGraphicsMode } from "./GraphicsMode";
 import { SectionReveal } from "./SectionReveal";
 import { SiteFooter } from "./SiteFooter";
@@ -569,14 +569,26 @@ function SponsorsSection() {
 
 function ScheduleSection() {
   const [selectedId, setSelectedId] = useState(scheduleItems[0].id);
-  const selected = scheduleItems.find((item) => item.id === selectedId) ?? scheduleItems[0];
+  const selectedIndex = Math.max(
+    0,
+    scheduleItems.findIndex((item) => item.id === selectedId)
+  );
+  const selected = scheduleItems[selectedIndex] ?? scheduleItems[0];
+
+  const goToIndex = (index: number) => {
+    const clamped = Math.max(0, Math.min(scheduleItems.length - 1, index));
+    setSelectedId(scheduleItems[clamped].id);
+  };
+
+  const atStart = selectedIndex === 0;
+  const atEnd = selectedIndex === scheduleItems.length - 1;
 
   return (
     <SectionReveal id="schedule" className="scroll-mt-28" delay={0.06}>
       <SectionShell
         eyebrow="Schedule"
         title="Key dates."
-        copy="Tap a milestone to update the single shared detail card below."
+        copy="Tap a milestone or use the arrows to update the shared detail card below."
       >
         <div className="space-y-6">
           <div className="overflow-x-auto pb-4">
@@ -627,28 +639,55 @@ function ScheduleSection() {
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                  Shared detail card
-                </p>
-                <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-                  {selected.title}
-                </h3>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => goToIndex(selectedIndex - 1)}
+              disabled={atStart}
+              aria-label="Previous milestone"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+
+            <div className="min-w-0 flex-1 rounded-[24px] border border-white/10 bg-black/30 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+                    Shared detail card
+                  </p>
+                  <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
+                    {selected.title}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3">
+                  {selected.badge ? (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45">
+                      {selected.badge}
+                    </span>
+                  ) : null}
+                  <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
+                    {selectedIndex + 1} / {scheduleItems.length}
+                  </span>
+                </div>
               </div>
-              {selected.badge ? (
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45">
-                  {selected.badge}
-                </span>
-              ) : null}
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
+                <span>{selected.date}</span>
+                <span>-</span>
+                <span>{selected.status ?? "Tentative"}</span>
+              </div>
             </div>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
-              <span>{selected.date}</span>
-              <span>-</span>
-              <span>{selected.status ?? "Tentative"}</span>
-            </div>
+
+            <button
+              type="button"
+              onClick={() => goToIndex(selectedIndex + 1)}
+              disabled={atEnd}
+              aria-label="Next milestone"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </SectionShell>
