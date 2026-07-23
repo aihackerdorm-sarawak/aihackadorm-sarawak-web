@@ -647,15 +647,19 @@ function drawLabelPoints(
   // controls the big value-digit dot density, and labels are small text that
   // needs to stay dense to read regardless of how sparse the digits get.
   // Coverage-grid sampling (not per-pixel) keeps the small letterforms clean
-  // and continuous; the threshold trades stroke thickness vs. legibility.
-  const labelCell = Math.max(2, Math.round(settings.sampleStride * 0.32));
-  return sampleLabelGrid(ctx, width, height, labelCell, layout, 0.22);
+  // and continuous. A FINER cell (more, smaller dots per letter) approximates
+  // the strokes/curves more smoothly — the coarser grid made the letters lumpy
+  // (H strokes uneven, O not a clean ring). The threshold trades stroke
+  // thickness vs. legibility.
+  const labelCell = Math.max(2, Math.round(settings.sampleStride * 0.26));
+  return sampleLabelGrid(ctx, width, height, labelCell, layout, 0.25);
 }
 
-// Bumped up from 0.55 now that labels render in a single pass with no
-// size-boosted glow layer to blend neighboring dots together — slightly
-// bigger label dots keep letterforms legible without the old overlap.
-const LABEL_SIZE_SCALE = 0.62;
+// Label dots are rendered on a finer coverage grid (see drawLabelPoints), so
+// they're kept a touch smaller than before — smaller crisp dots on a denser
+// grid read as cleaner, more orderly letterforms than fewer fat dots that
+// blob together.
+const LABEL_SIZE_SCALE = 0.5;
 const FLASH_SIZE_BOOST = 0.55;
 
 // Cursor "magnifying glass" hover (inspired by the OpenAI Build Week
