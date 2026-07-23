@@ -52,8 +52,7 @@ type CountdownSettings = {
   pointScale: number;
   sampleStride: number;
   maxParticles: number;
-  glowLayerScale: number;
-  glowOpacity: number;
+  dotOpacity: number;
 };
 
 type ParticleSystem = {
@@ -76,14 +75,33 @@ varying float vSeed;
 uniform float uTime;
 uniform float uPointScale;
 uniform float uLayerScale;
+uniform float uDprScale;
 uniform float uSceneWidth;
 uniform float uSceneHeight;
 uniform float uWaveXFrequency;
 uniform float uWaveYFrequency;
+uniform vec2 uPointer;
+uniform float uMagnifyRadius;
+uniform float uMagnifyBoost;
+uniform float uChromaRadius;
+
+varying float vChroma;
+varying vec2 vChromaDir;
 
 void main() {
   vColor = aColor;
   vSeed = fract(sin(dot(position.xy, vec2(12.9898, 78.233))) * 43758.5453);
+
+  // Magnifying-glass hover: dots within uMagnifyRadius of the cursor swell in
+  // size — like screen pixels seen through a droplet of water / a lens. The
+  // chromatic radius is a SEPARATE knob so the RGB lens-fringe (in the
+  // fragment shader) can cover a tighter/looser area than the swell, and the
+  // repel (JS spring loop) has its own radius again — three independent knobs.
+  vec2 toDot = position.xy - uPointer;
+  float pdist = length(toDot);
+  float magnify = smoothstep(uMagnifyRadius, 0.0, pdist);
+  vChroma = smoothstep(uChromaRadius, 0.0, pdist);
+  vChromaDir = pdist > 0.0001 ? toDot / pdist : vec2(0.0);
 
   vec3 displaced = position;
   float normalizedX = position.x / max(0.001, uSceneWidth);
@@ -97,7 +115,12 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
   float perspective = 245.0 / max(0.001, -mvPosition.z);
 
-  gl_PointSize = aSize * uPointScale * uLayerScale * perspective;
+  // gl_PointSize is in framebuffer pixels, so a fixed value renders at a
+  // different on-screen size depending on the device pixel ratio (making
+  // dots blob together at low DPR and shrink at high DPR). uDprScale =
+  // rendererPixelRatio / REFERENCE_DPR cancels that out, keeping each dot a
+  // consistent on-screen size across displays, zoom levels, and builds.
+  gl_PointSize = aSize * uPointScale * uLayerScale * perspective * uDprScale * (1.0 + magnify * uMagnifyBoost);
   gl_Position = projectionMatrix * mvPosition;
 }
 `;
@@ -105,6 +128,8 @@ void main() {
 const fragmentShader = `
 varying vec3 vColor;
 varying float vSeed;
+varying float vChroma;
+varying vec2 vChromaDir;
 
 uniform float uTime;
 uniform float uOpacity;
@@ -113,26 +138,68 @@ uniform float uGlowInner;
 uniform float uGlowOuter;
 uniform float uTwinkle;
 uniform vec3 uTintColor;
+uniform float uChromaAmount;
+uniform float uChromaRedLift;
 
-void main() {
-  vec2 uv = gl_PointCoord - vec2(0.5);
+// The dot's soft-disc coverage at a given sprite-space offset from centre.
+float dotAlpha(vec2 uv) {
   float dist = length(uv);
   float glow = 1.0 - smoothstep(uGlowInner, uGlowOuter, dist);
   float core = 1.0 - smoothstep(0.0, 0.42, dist);
-  float alpha = mix(core, core * 0.6 + glow * 0.4, uSoftness);
+  return mix(core, core * 0.6 + glow * 0.4, uSoftness);
+}
 
+void main() {
+  vec2 uv = gl_PointCoord - vec2(0.5);
   float twinkle = 1.0 + sin(uTime * 3.7 + vSeed * 6.28318) * uTwinkle;
+  float mul = uOpacity * twinkle;
 
-  gl_FragColor = vec4(vColor * uTintColor, alpha * uOpacity * twinkle);
+  vec3 baseCol = vColor * uTintColor;
+
+  // Base disc coverage — sampled once; this is the ONLY dotAlpha call for the
+  // (overwhelmingly common) un-hovered fragments, so the chromatic split never
+  // costs fill rate unless the cursor is actually near. vChroma is constant
+  // across a point sprite, so this branch is coherent (no GPU divergence).
+  float a = dotAlpha(uv);
+  vec3 color;
+
+  if (vChroma > 0.001) {
+    // Chromatic aberration (lens fringe): re-sample the disc at RGB-split
+    // offsets along the radial-from-cursor direction, so a magnified dot shows
+    // a red edge on one side and a cyan edge on the other — light splitting
+    // through a lens. gl_PointCoord's y runs opposite to world y, so flip it.
+    vec2 off = vec2(vChromaDir.x, -vChromaDir.y) * (vChroma * uChromaAmount);
+    float aR = dotAlpha(uv + off);
+    float aB = dotAlpha(uv - off);
+    // Base dots are cyan (almost no red), so lift red a touch under the cursor
+    // for the split to read as a red/cyan fringe rather than a cyan-only smear.
+    float redCol = mix(baseCol.r, 1.0, vChroma * uChromaRedLift);
+    color = vec3(redCol * aR, baseCol.g * a, baseCol.b * aB);
+  } else {
+    color = baseCol * a;
+  }
+
+  // Premultiply by coverage/opacity/twinkle; output alpha 1 so the additive
+  // blend just adds this (the disc falloff already lives in the rgb).
+  color *= mul;
+
+  gl_FragColor = vec4(color, 1.0);
 }
 `;
 
-const PALETTE = ["#ffffff", "#f0f0f0", "#cacaca"] as const;
+const PALETTE = ["#a5f3fc", "#22d3ee", "#0891b2"] as const;
 
 function hash01(seed: number) {
   const value = Math.sin(seed * 12.9898) * 43758.5453;
   return value - Math.floor(value);
 }
+
+// How long the window must be still before a resize is committed. A live
+// resize would otherwise re-render the countdown on every intermediate size,
+// each time recomputing settings and re-running the structural effect that
+// rebuilds 8 offscreen canvases + getImageData. We sync once immediately on
+// mount, then only after the drag settles.
+const RESIZE_DEBOUNCE_MS = 150;
 
 function useViewportWidth() {
   const [width, setWidth] = useState(() =>
@@ -140,10 +207,19 @@ function useViewportWidth() {
   );
 
   useEffect(() => {
-    const update = () => setWidth(window.innerWidth);
-    update();
+    // No immediate sync needed: the useState initializer already reads
+    // window.innerWidth on the client, and this hook only runs client-side
+    // (the countdown mounts after isMounted), so there's no SSR value to fix.
+    let timer: number;
+    const update = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setWidth(window.innerWidth), RESIZE_DEBOUNCE_MS);
+    };
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   return width;
@@ -155,10 +231,17 @@ function useViewportHeight() {
   );
 
   useEffect(() => {
-    const update = () => setHeight(window.innerHeight);
-    update();
+    // See useViewportWidth — the initializer covers the initial client value.
+    let timer: number;
+    const update = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setHeight(window.innerHeight), RESIZE_DEBOUNCE_MS);
+    };
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   return height;
@@ -193,6 +276,11 @@ function pixelsToWorldUnits(px: number, viewportHeightPx: number, cameraViewport
 }
 
 const COUNTDOWN_FONT_FAMILY = `"Arial Black", "Segoe UI Black", system-ui, sans-serif`;
+// Labels use a NORMAL family (not the black display face) so their numeric
+// weight actually takes effect — with "Arial Black" the browser renders the
+// heavy named face regardless of weight, which dot-samples into thick blobs.
+// A lighter weight here reads cleaner at the small label dot count.
+const LABEL_FONT_FAMILY = `"Segoe UI", system-ui, Arial, sans-serif`;
 
 function fitTextFontSize(
   ctx: CanvasRenderingContext2D,
@@ -241,13 +329,17 @@ function getSettings(
   const visibleHeight = 2 * cameraZ * Math.tan((cameraFov * Math.PI) / 360);
   const aspect = measuredWidth / measuredHeight;
   const visibleWidth = visibleHeight * aspect;
-  const layoutScale = stacked ? 0.85 : 0.90;
+  const layoutScale = stacked ? 0.92 : 0.90;
   const particleScale = quality === "high" ? 1.02 : quality === "medium" ? 0.98 : 0.94;
 
   if (quality === "high") {
     return {
-      canvasWidth: 1500,
-      canvasHeight: 380,
+      // Must be stacked-aware like the other tiers: a portrait (tall) canvas
+      // for the stacked 4-row mobile layout, landscape for the desktop row.
+      // Without this, a narrow window on the high tier feeds a portrait layout
+      // through a landscape canvas and the digits render squished/distorted.
+      canvasWidth: stacked ? 820 : 1500,
+      canvasHeight: stacked ? 940 : 380,
       fontSize: stacked ? 128 : 138,
       layoutScale,
       sceneWidth: visibleWidth * layoutScale,
@@ -256,18 +348,17 @@ function getSettings(
       pointSizeMin: 0.032 * viewportScale * particleScale,
       pointSizeMax: 0.062 * viewportScale * particleScale,
       pointScale: 3.9 * viewportScale * particleScale,
-      sampleStride: stacked ? 8 : 8,
-      maxParticles: stacked ? 4400 : 6200,
-      glowLayerScale: 1.9,
-      glowOpacity: 0.32,
+      sampleStride: stacked ? 11 : 11,
+      maxParticles: stacked ? 3200 : 4400,
+      dotOpacity: 0.92,
     };
   }
 
   if (quality === "low") {
-    // Mobile / low-power tier. A much tighter glow (small layerScale + low
-    // opacity + small crisp dots) both cuts additive-blend fill rate — the
-    // main mobile-GPU bottleneck on Firefox/Safari — and keeps the dots from
-    // merging into blobs, so the digits read cleaner, not just cheaper.
+    // Mobile / low-power tier. Sparser sampling + a single render pass (no
+    // glow layer) both cut fill rate — the main mobile-GPU bottleneck on
+    // Firefox/Safari — and keep the dots from merging into blobs, so the
+    // digits read cleaner, not just cheaper.
     return {
       canvasWidth: stacked ? 760 : 1120,
       canvasHeight: stacked ? 860 : 280,
@@ -279,10 +370,9 @@ function getSettings(
       pointSizeMin: 0.023 * viewportScale * particleScale,
       pointSizeMax: 0.044 * viewportScale * particleScale,
       pointScale: 3.0 * viewportScale * particleScale,
-      sampleStride: stacked ? 9 : 9,
-      maxParticles: stacked ? 2400 : 3400,
-      glowLayerScale: 1.35,
-      glowOpacity: 0.24,
+      sampleStride: stacked ? 13 : 13,
+      maxParticles: stacked ? 1700 : 2400,
+      dotOpacity: 0.82,
     };
   }
 
@@ -297,10 +387,9 @@ function getSettings(
     pointSizeMin: 0.029 * viewportScale * particleScale,
     pointSizeMax: 0.056 * viewportScale * particleScale,
     pointScale: 3.5 * viewportScale * particleScale,
-    sampleStride: stacked ? 8 : 8,
-    maxParticles: stacked ? 3700 : 5200,
-    glowLayerScale: 1.7,
-    glowOpacity: 0.3,
+    sampleStride: stacked ? 11 : 11,
+    maxParticles: stacked ? 2700 : 3700,
+    dotOpacity: 0.88,
   };
 }
 
@@ -322,7 +411,7 @@ function reduceSamplePoints(points: SamplePoint[], maxParticles: number) {
   return reduced;
 }
 
-const SEGMENT_LABELS = ["DAYS", "HOURS", "MINS", "SECS"] as const;
+const SEGMENT_LABELS = ["DAY", "HOUR", "MIN", "SEC"] as const;
 
 type FontSizes = {
   valueFont: number;
@@ -368,9 +457,12 @@ function computeFontSizes(
   );
 
   if (stacked) {
+    // Mobile: digits were height-limited to ~45% of each row, leaving a lot
+    // of empty space. Let them fill more of the row (and the wide horizontal
+    // room) so the countdown reads much larger on small screens.
     const rowHeight = settings.canvasHeight / 4;
-    const maxTextWidth = settings.canvasWidth * 0.6;
-    const maxTextHeight = rowHeight * 0.45;
+    const maxTextWidth = settings.canvasWidth * 0.8;
+    const maxTextHeight = rowHeight * 0.55;
 
     const valueFont = fitTextFontSize(
       ctx,
@@ -378,9 +470,9 @@ function computeFontSizes(
       maxTextWidth,
       maxTextHeight,
       48,
-      Math.max(90, Math.round(settings.fontSize * 1.1))
+      Math.max(140, Math.round(settings.fontSize * 1.45))
     );
-    const labelFont = fitTextFontSize(ctx, "HOURS", settings.canvasWidth * 0.4, rowHeight * 0.15, 16, 36);
+    const labelFont = fitTextFontSize(ctx, "HOUR", settings.canvasWidth * 0.5, rowHeight * 0.2, 16, 50);
 
     return { valueFont, labelFont };
   }
@@ -397,7 +489,7 @@ function computeFontSizes(
     90,
     Math.max(144, Math.round(settings.fontSize * 1.3))
   );
-  const labelFont = fitTextFontSize(ctx, "HOURS", cardWidth * 0.64, cardHeight * 0.22, 20, 42);
+  const labelFont = fitTextFontSize(ctx, "HOUR", cardWidth * 0.72, cardHeight * 0.26, 20, 50);
 
   return { valueFont, labelFont };
 }
@@ -419,6 +511,49 @@ function sampleCanvasPoints(
 
       if (alpha > 12) {
         points.push({ x: layout.originX + x, y: layout.originY + y, alpha });
+      }
+    }
+  }
+
+  return points;
+}
+
+// Dot-matrix sampler for small label text. Instead of reading one pixel per
+// grid point (which makes thin, light strokes flicker in and out depending on
+// where the grid happens to cut them — ragged U/S/C), this averages the glyph
+// coverage over each whole grid cell and lights the cell if it clears a
+// coverage threshold. That's how a real LED matrix renders type: every cell a
+// stroke passes through turns on, giving continuous, evenly-spaced letters.
+// All emitted dots are uniform (alpha 255) so there's no size/brightness
+// jitter along the strokes.
+function sampleLabelGrid(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  cell: number,
+  layout: SegmentLayout,
+  coverageThreshold: number
+): SamplePoint[] {
+  const image = ctx.getImageData(0, 0, width, height).data;
+  const points: SamplePoint[] = [];
+  const cellArea = cell * cell;
+
+  for (let gy = 0; gy + cell <= height; gy += cell) {
+    for (let gx = 0; gx + cell <= width; gx += cell) {
+      let sum = 0;
+      for (let y = gy; y < gy + cell; y += 1) {
+        const rowBase = y * width;
+        for (let x = gx; x < gx + cell; x += 1) {
+          sum += image[(rowBase + x) * 4 + 3];
+        }
+      }
+      const coverage = sum / (cellArea * 255);
+      if (coverage > coverageThreshold) {
+        points.push({
+          x: layout.originX + gx + cell / 2,
+          y: layout.originY + gy + cell / 2,
+          alpha: 255,
+        });
       }
     }
   }
@@ -501,28 +636,61 @@ function drawLabelPoints(
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `500 ${labelFont}px ${COUNTDOWN_FONT_FAMILY}`;
+  ctx.font = `600 ${labelFont}px ${LABEL_FONT_FAMILY}`;
 
   const labelY = stacked
     ? height * 0.8
     : settings.canvasHeight * 0.05 + settings.canvasHeight * 0.8 * 0.8;
   ctx.fillText(label, width / 2, labelY);
 
-  const labelStride = Math.max(2, Math.round(settings.sampleStride * 0.45));
-  return sampleCanvasPoints(ctx, width, height, labelStride, layout);
+  // Deliberately not scaled directly off settings.sampleStride: that value
+  // controls the big value-digit dot density, and labels are small text that
+  // needs to stay dense to read regardless of how sparse the digits get.
+  // Coverage-grid sampling (not per-pixel) keeps the small letterforms clean
+  // and continuous. A FINER cell (more, smaller dots per letter) approximates
+  // the strokes/curves more smoothly — the coarser grid made the letters lumpy
+  // (H strokes uneven, O not a clean ring). The threshold trades stroke
+  // thickness vs. legibility.
+  const labelCell = Math.max(2, Math.round(settings.sampleStride * 0.26));
+  return sampleLabelGrid(ctx, width, height, labelCell, layout, 0.25);
 }
 
-const LABEL_SIZE_SCALE = 0.55;
+// Label dots are rendered on a finer coverage grid (see drawLabelPoints), so
+// they're kept a touch smaller than before — smaller crisp dots on a denser
+// grid read as cleaner, more orderly letterforms than fewer fat dots that
+// blob together.
+const LABEL_SIZE_SCALE = 0.5;
 const FLASH_SIZE_BOOST = 0.55;
+
+// Cursor "magnifying glass" hover (inspired by the OpenAI Build Week
+// countdown): near the cursor the dots swell (lens magnification), get pushed
+// out of their slots (repel), and show a subtle red/cyan chromatic-aberration
+// fringe (lens dispersion) — like screen pixels under a droplet of water.
+// Three INDEPENDENT radii so each can be tuned on its own; the repel radius
+// lives in the useFrame loop (see repelRadius).
+const MAGNIFY_RADIUS = 0.7; // where dots swell in size
+const MAGNIFY_BOOST = 1.9; // dot at the cursor is up to ~2.9x its base size
+const CHROMA_RADIUS = 1.0; // where the RGB lens-fringe shows (kept tighter → subtle)
+const CHROMA_AMOUNT = 0.23; // max RGB split, in sprite-space fraction (0..1)
+const CHROMA_RED_LIFT = 0.67; // how much red to add under the cursor so the fringe reads
+
+// The device pixel ratio the dot sizes are tuned against. gl_PointSize is
+// scaled by (actualPixelRatio / REFERENCE_DPR) so a dot keeps the same
+// on-screen size regardless of the display's DPR, the browser zoom, or
+// whether AdaptiveDpr has lowered the render resolution. 1.5 matches a
+// typical laptop; nudge this one value if dots read a touch large/small.
+const REFERENCE_DPR = 1.5;
 
 // Damped-spring constants for how a dot returns to rest after being
 // repelled or reassigned to a new target. Higher stiffness pulls harder;
 // higher damping resists faster, cutting down overshoot. The ratio between
-// them controls the "bounce" — see the useFrame loop below.
-const SPRING_STIFFNESS = 170;
-const SPRING_DAMPING = 19;
-const SPRING_STIFFNESS_REDUCED = 90;
-const SPRING_DAMPING_REDUCED = 28;
+// them controls the "bounce" — see the useFrame loop below. Stiffness scales
+// with the square of damping (not linearly) to speed up settle time while
+// keeping the same damping ratio, i.e. the same amount of bounce, just faster.
+const SPRING_STIFFNESS = 330;
+const SPRING_DAMPING = 27;
+const SPRING_STIFFNESS_REDUCED = 176;
+const SPRING_DAMPING_REDUCED = 39;
 const MAX_SPRING_DT = 1 / 30;
 
 const PALETTE_RGB = PALETTE.map(
@@ -699,7 +867,6 @@ function CountdownDigitGroup({
   waveYFrequency,
   reducedMotion,
   pointerWorld,
-  pointerActive,
 }: {
   value: string;
   label: string;
@@ -713,12 +880,10 @@ function CountdownDigitGroup({
   waveYFrequency: number;
   reducedMotion: boolean;
   pointerWorld: MutableRefObject<Vector3>;
-  pointerActive: MutableRefObject<boolean>;
 }) {
   const [geometry] = useState(() => new BufferGeometry());
   const positionAttributeRef = useRef<BufferAttribute | null>(null);
-  const glowMaterialRef = useRef<ShaderMaterial>(null!);
-  const coreMaterialRef = useRef<ShaderMaterial>(null!);
+  const materialRef = useRef<ShaderMaterial>(null!);
   const systemRef = useRef<ParticleSystem | null>(null);
   const structuralKeyRef = useRef<string>("");
   const charPoolRef = useRef<{ offsets: number[]; sizes: number[]; chars: string[] } | null>(null);
@@ -891,12 +1056,18 @@ function CountdownDigitGroup({
     const dt = Math.min(delta, MAX_SPRING_DT);
     const t = state.clock.elapsedTime;
     const pointer = pointerWorld.current;
-    const repelRadius = reducedMotion ? 0.4 : 0.68;
-    const repelStrength = reducedMotion ? 0.14 : 0.34;
+    // pointerWorld is parked at x=999 when the cursor is off the canvas; a real
+    // scene x is within ~±11, so this cheaply means "cursor is over the timer".
+    const pointerNear = pointer.x < 500;
+    const repelRadius = reducedMotion ? 0.62 : 1.25;
+    const repelStrength = reducedMotion ? 0.3 : 0.85;
     const stiffness = reducedMotion ? SPRING_STIFFNESS_REDUCED : SPRING_STIFFNESS;
     const damping = reducedMotion ? SPRING_DAMPING_REDUCED : SPRING_DAMPING;
 
-    if (pointerActive.current) {
+    // Hover = repel (dots pushed out of their grid slot in the spring loop
+    // below) + a shader spotlight (size/brightness via uPointer). Keep the loop
+    // awake while the cursor is over the timer so the repel actually animates.
+    if (pointerNear) {
       settleCompleteRef.current = false;
     }
 
@@ -937,24 +1108,20 @@ function CountdownDigitGroup({
       sizeAttribute.needsUpdate = true;
     }
 
-    if (glowMaterialRef.current) {
-      glowMaterialRef.current.uniforms.uTime.value = t;
-      glowMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
-      glowMaterialRef.current.uniforms.uLayerScale.value = settings.glowLayerScale;
-      glowMaterialRef.current.uniforms.uOpacity.value = settings.glowOpacity;
-      glowMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
-      glowMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
-      glowMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
-      glowMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
-    }
+    const dprScale = state.gl.getPixelRatio() / REFERENCE_DPR;
 
-    if (coreMaterialRef.current) {
-      coreMaterialRef.current.uniforms.uTime.value = t;
-      coreMaterialRef.current.uniforms.uPointScale.value = settings.pointScale;
-      coreMaterialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
-      coreMaterialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
-      coreMaterialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
-      coreMaterialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
+    if (materialRef.current) {
+      materialRef.current.uniforms.uTime.value = t;
+      materialRef.current.uniforms.uPointScale.value = settings.pointScale;
+      materialRef.current.uniforms.uOpacity.value = settings.dotOpacity;
+      materialRef.current.uniforms.uDprScale.value = dprScale;
+      materialRef.current.uniforms.uSceneWidth.value = settings.sceneWidth;
+      materialRef.current.uniforms.uSceneHeight.value = settings.sceneHeight;
+      materialRef.current.uniforms.uWaveXFrequency.value = waveXFrequency;
+      materialRef.current.uniforms.uWaveYFrequency.value = waveYFrequency;
+      const hoverPointer = materialRef.current.uniforms.uPointer.value as number[];
+      hoverPointer[0] = pointer.x;
+      hoverPointer[1] = pointer.y;
     }
 
     if (settleCompleteRef.current && !flashActive) {
@@ -978,14 +1145,15 @@ function CountdownDigitGroup({
       let desiredY = baseY;
       let desiredZ = baseZ;
 
-      if (pointerActive.current) {
+      if (pointerNear) {
         const dx = baseX - pointer.x;
         const dy = baseY - pointer.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < repelRadius) {
-          // Power curve concentrates the push near the cursor itself
-          // rather than spreading it evenly across the whole radius.
+          // Power curve concentrates the push near the cursor itself rather
+          // than spreading it evenly across the whole radius. Layers under the
+          // shader spotlight so the pushed-out dots also scale up and brighten.
           const influence = Math.pow(1 - distance / repelRadius, 1.4);
           const inverse = 1 / Math.max(distance, 0.0001);
           desiredX += dx * inverse * influence * repelStrength;
@@ -1030,7 +1198,7 @@ function CountdownDigitGroup({
       positionAttributeRef.current.needsUpdate = true;
     }
 
-    if (!pointerActive.current && maxPosDelta < posThreshold && maxVel < velThreshold && !flashActive) {
+    if (maxPosDelta < posThreshold && maxVel < velThreshold && !flashActive) {
       settleCompleteRef.current = true;
     }
   });
@@ -1039,7 +1207,7 @@ function CountdownDigitGroup({
     <group>
       <points geometry={geometry} renderOrder={2}>
         <shaderMaterial
-          ref={glowMaterialRef}
+          ref={materialRef}
           vertexShader={vertexShader}
           fragmentShader={fragmentShader}
           transparent
@@ -1048,43 +1216,26 @@ function CountdownDigitGroup({
           uniforms={{
             uTime: { value: 0 },
             uPointScale: { value: settings.pointScale },
-            uLayerScale: { value: settings.glowLayerScale },
-            uOpacity: { value: settings.glowOpacity },
-            uSoftness: { value: 1 },
-            uGlowInner: { value: 0.05 },
-            uGlowOuter: { value: 0.5 },
-            uTwinkle: { value: 0.07 },
-            uTintColor: { value: [0.93, 0.97, 1] },
+            uLayerScale: { value: 1 },
+            uDprScale: { value: 1 },
+            uOpacity: { value: settings.dotOpacity },
+            uSoftness: { value: 0.5 },
+            uGlowInner: { value: 0.08 },
+            uGlowOuter: { value: 0.46 },
+            uTwinkle: { value: 0.08 },
+            uTintColor: { value: [0.4, 1, 1] },
             uSceneWidth: { value: settings.sceneWidth },
             uSceneHeight: { value: settings.sceneHeight },
             uWaveXFrequency: { value: waveXFrequency },
             uWaveYFrequency: { value: waveYFrequency },
-          }}
-        />
-      </points>
-
-      <points geometry={geometry} renderOrder={3}>
-        <shaderMaterial
-          ref={coreMaterialRef}
-          vertexShader={vertexShader}
-          fragmentShader={fragmentShader}
-          transparent
-          depthWrite={false}
-          blending={AdditiveBlending}
-          uniforms={{
-            uTime: { value: 0 },
-            uPointScale: { value: settings.pointScale },
-            uLayerScale: { value: 0.88 },
-            uOpacity: { value: 0.96 },
-            uSoftness: { value: 0 },
-            uGlowInner: { value: 0.14 },
-            uGlowOuter: { value: 0.5 },
-            uTwinkle: { value: 0.03 },
-            uTintColor: { value: [1, 1, 1] },
-            uSceneWidth: { value: settings.sceneWidth },
-            uSceneHeight: { value: settings.sceneHeight },
-            uWaveXFrequency: { value: waveXFrequency },
-            uWaveYFrequency: { value: waveYFrequency },
+            // Far off-screen by default so nothing is "hovered" until the
+            // pointer moves over the canvas and updates this each frame.
+            uPointer: { value: [9999, 9999] },
+            uMagnifyRadius: { value: MAGNIFY_RADIUS },
+            uMagnifyBoost: { value: MAGNIFY_BOOST },
+            uChromaRadius: { value: CHROMA_RADIUS },
+            uChromaAmount: { value: CHROMA_AMOUNT },
+            uChromaRedLift: { value: CHROMA_RED_LIFT },
           }}
         />
       </points>
@@ -1107,7 +1258,6 @@ function CountdownDigits({
   containerHeightPx: number;
   countdown: CountdownValue;
 }) {
-  const pointerActive = useRef(false);
   const viewportWidth = useViewportWidth();
   const viewportHeight = useViewportHeight();
   const stacked = useStackedLayout();
@@ -1138,8 +1288,12 @@ function CountdownDigits({
     );
     return settings.sceneOffsetY - headerWorldHeight * 0.08;
   }, [cameraViewportHeight, headerHeightPx, settings.sceneOffsetY, viewportHeight]);
-  const pointerWorld = useRef(new Vector3(0, 0, 0));
-  const pointerDebugCount = useRef(0);
+  // Parked off-canvas (matches handlePointerLeave below), NOT world origin —
+  // (0,0,0) sits dead-center of the countdown, so before any real pointer
+  // event ever fires (e.g. the mouse hasn't touched the canvas since load),
+  // the hover shader read that as "cursor is here" and phantom-hovered the
+  // middle dots (magnify/repel/chromatic fringe) with no cursor present.
+  const pointerWorld = useRef(new Vector3(999, 999, 999));
   const hitPlaneScale = useMemo(
     () => [settings.sceneWidth, settings.sceneHeight, 1] as const,
     [settings.sceneHeight, settings.sceneWidth]
@@ -1162,12 +1316,24 @@ function CountdownDigits({
     [countdown.days, countdown.hours, countdown.minutes, countdown.seconds]
   );
 
+  // The fitted font depends only on the longest value's LENGTH (Arial Black
+  // digits are tabular / equal width), not on the specific digits — so key the
+  // fit on that length, not on `values` which change every second, to avoid
+  // re-running the binary-search measureText fit on every tick.
+  const maxValueLength = useMemo(
+    () => values.reduce((longest, value) => Math.max(longest, value.length), 1),
+    [values]
+  );
+
   const fonts = useMemo(() => {
     if (!measureCtx) {
       return { valueFont: settings.fontSize, labelFont: 28 };
     }
-    return computeFontSizes(measureCtx, values, stacked, settings);
-  }, [measureCtx, values, stacked, settings]);
+    // A representative all-'0' string of the longest length stands in for the
+    // fit (same width as any real value of that length).
+    const representative = "0".repeat(maxValueLength);
+    return computeFontSizes(measureCtx, [representative], stacked, settings);
+  }, [measureCtx, maxValueLength, stacked, settings]);
 
   useFrame((state) => {
     state.camera.position.z = MathUtils.lerp(state.camera.position.z, cameraZ, 0.06);
@@ -1175,20 +1341,11 @@ function CountdownDigits({
 
   const handlePointerMove = (event: ThreeEvent<PointerEvent>) => {
     pointerWorld.current.copy(event.point);
-    pointerActive.current = true;
-
-    if (pointerDebugCount.current < 8) {
-      pointerDebugCount.current += 1;
-      console.debug("[countdown pointer]", {
-        point: event.point.toArray(),
-        container: [containerWidthPx, containerHeightPx],
-        scene: [settings.sceneWidth, settings.sceneHeight],
-      });
-    }
   };
 
   const handlePointerLeave = () => {
-    pointerActive.current = false;
+    // Park the pointer far off-screen so the shader's distance-based hover
+    // falls to zero everywhere (no "active" flag needed).
     pointerWorld.current.set(999, 999, 999);
   };
 
@@ -1219,7 +1376,6 @@ function CountdownDigits({
           waveYFrequency={waveYFrequency}
           reducedMotion={reducedMotion}
           pointerWorld={pointerWorld}
-          pointerActive={pointerActive}
         />
       ))}
     </group>

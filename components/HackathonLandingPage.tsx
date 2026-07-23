@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
@@ -60,24 +60,16 @@ const scheduleItems: ScheduleItem[] = [
     hint: "Build begins",
     title: "Main event begins",
     copy:
-      "The main hackathon start date. The countdown then shifts into the 48-hour live event window until completion.",
-    status: "2-day event",
+      "The main hackathon start date. The countdown then shifts into the 24-hour live event window until completion.",
+    status: "1-day event",
   },
 ];
 
-const benefitCards = [
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-];
+const benefitCards = ["To Be Announced", "To Be Announced", "To Be Announced"];
 
 const partnerLinks = [
-  { label: "LinkedIn", href: "https://www.linkedin.com/in/borneo-hackathon-6b80bb421" },
-  { label: "Instagram", href: "https://www.instagram.com/ai_hackerdorm_sarawak/" },
-  { label: "Email", href: "mailto:example@gmail.com" },
+  { label: "Instagram", handle: "@aihackerdorm.sarawak", href: "https://www.instagram.com/aihackerdorm.sarawak/" },
+  { label: "Email", handle: "example@gmail.com", href: "mailto:example@gmail.com" },
 ];
 
 function useScrollToId() {
@@ -140,8 +132,16 @@ function useSectionObserver<T extends HTMLElement>() {
           setIsInView(entry.isIntersecting);
         }
       },
+      // threshold is a fraction of the observed element's OWN height, not the
+      // viewport — fine for a section roughly one viewport tall (Hero), but
+      // WaveZone wraps six stacked subsections (~2800px), so 8% of that is
+      // ~225px and the wave stayed frozen at active=false until deep into a
+      // scroll. threshold: 0 fires on any intersection regardless of the
+      // target's size; rootMargin pre-activates just before it's on screen
+      // so there's no visible pop-in.
       {
-        threshold: 0.08,
+        threshold: 0,
+        rootMargin: "200px 0px",
       }
     );
 
@@ -166,7 +166,7 @@ function SectionShell({
   return (
     <div className="rounded-[30px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur-md sm:p-7">
       <div className="max-w-3xl space-y-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-white/35">{eyebrow}</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60">{eyebrow}</p>
         <h2 className="text-3xl font-black uppercase tracking-[-0.06em] text-white sm:text-5xl">
           {title}
         </h2>
@@ -205,10 +205,10 @@ function CountdownLabels() {
     <div className="pointer-events-none absolute inset-x-0 top-4 z-20 px-4 sm:top-5 sm:px-6">
       <div className="grid gap-4 text-center md:grid-cols-4">
         {[
-          ["days", "Days"],
-          ["hours", "Hours"],
-          ["minutes", "Mins"],
-          ["seconds", "Secs"],
+          ["days", "Day"],
+          ["hours", "Hour"],
+          ["minutes", "Min"],
+          ["seconds", "Sec"],
         ].map(([key, label]) => (
           <div key={key} className="space-y-2">
             <div className="font-mono text-[10px] uppercase tracking-[0.42em] text-white/42">
@@ -244,30 +244,41 @@ function CountdownWebGLFrame({
       return;
     }
 
-    const update = (entry: ResizeObserverEntry) => {
-      setContainerWidthPx(entry.contentRect.width);
-      setContainerHeightPx(entry.contentRect.height);
+    const commit = (width: number, height: number) => {
+      setContainerWidthPx(width);
+      setContainerHeightPx(height);
     };
 
+    // Debounce: the container size drives sceneWidth/Height, which are part of
+    // the digit-group structural key, so committing every intermediate resize
+    // size re-samples all the digit/label text (8 offscreen canvases +
+    // getImageData) per frame during a drag. Commit only once it settles; the
+    // initial size below is applied immediately so first paint is correct.
+    let timer: number;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) {
-        update(entry);
+      if (!entry) {
+        return;
       }
+      const { width, height } = entry.contentRect;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => commit(width, height), 150);
     });
 
     const rect = element.getBoundingClientRect();
-    setContainerWidthPx(rect.width);
-    setContainerHeightPx(rect.height);
+    commit(rect.width, rect.height);
     observer.observe(element);
 
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
   }, []);
 
   return (
     <div
       ref={frameRef}
-      className="relative h-[500px] md:h-[300px] w-full overflow-hidden rounded-[30px] bg-black/40"
+      className="relative h-[560px] md:h-[300px] w-full overflow-hidden rounded-[30px] bg-black/40"
     >
       {/* <CountdownLabels /> */}
       <CountdownScene
@@ -350,10 +361,10 @@ function CountdownFallback({
   return (
     <div className="grid gap-4 rounded-[30px] border border-white/10 bg-black/35 p-5 text-center sm:grid-cols-4 sm:gap-5 sm:p-7">
       {[
-        ["days", "Days"],
-        ["hours", "Hours"],
-        ["minutes", "Mins"],
-        ["seconds", "Secs"],
+        ["days", "Day"],
+        ["hours", "Hour"],
+        ["minutes", "Min"],
+        ["seconds", "Sec"],
       ].map(([key, label]) => (
         <div key={key} className="rounded-[24px] border border-white/10 bg-white/[0.035] px-4 py-5">
           <div className="text-[clamp(2.1rem,8vw,4rem)] font-black leading-none tracking-[-0.08em] text-white">
@@ -368,6 +379,10 @@ function CountdownFallback({
   );
 }
 
+// Stable no-op subscribe for the client-mount check below (useSyncExternalStore
+// requires a referentially stable subscribe).
+const subscribeNoop = () => () => {};
+
 function CountdownSection() {
   const reducedMotion = useReducedMotion() ?? true;
   const { graphicsEnabled } = useGraphicsMode();
@@ -375,17 +390,23 @@ function CountdownSection() {
   const { stage, values } = useCountdownState();
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeightPx, setHeaderHeightPx] = useState(0);
-  const [isMounted, setIsMounted] = useState(false);
-  const [quality, setQuality] = useState<QualityTier>("medium");
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setIsMounted(true);
-      setQuality(getDeviceQuality());
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
+  // Client-only mount gate for the WebGL countdown. Was previously an
+  // isMounted flag flipped inside requestAnimationFrame — but rAF is
+  // throttled/paused in a background or unfocused tab, so the countdown stayed
+  // absent until the tab was focused. useSyncExternalStore returns false on
+  // the server + during hydration and true once mounted, hydration-safe and
+  // NOT tied to frame timing. Quality is device-based and never changes, so a
+  // lazy useState initializer computes it once (returns "medium" on the
+  // server, where getDeviceQuality can't touch navigator/matchMedia).
+  const isMounted = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  );
+  const [quality] = useState<QualityTier>(() =>
+    typeof window === "undefined" ? "medium" : getDeviceQuality()
+  );
 
   useEffect(() => {
     const element = headerRef.current;
@@ -418,7 +439,7 @@ function CountdownSection() {
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <div ref={headerRef} className="max-w-4xl space-y-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-white/35">
+          <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60">
             Countdown
           </p>
           <h2 className="text-4xl font-black uppercase tracking-[-0.08em] text-white sm:text-6xl lg:text-7xl">
@@ -427,8 +448,8 @@ function CountdownSection() {
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
             {stage.eyebrow}.{" "}
             {stage.phase === "event-live"
-              ? "The final phase is a 48-hour live event window before the page flips to the completed state."
-              : "The chain advances automatically from registration, to workshop, to the main event, and then to completion."}
+              ? "The main event is live — 24 hours on the clock until it wraps up."
+              : "This page updates automatically as each milestone — registration, the workshop, and the main event — arrives."}
           </p>
         </div>
 
@@ -473,18 +494,38 @@ function CountdownSection() {
 function HeroSection() {
   const reducedMotion = useReducedMotion() ?? true;
   const navigate = useScrollToId();
+  const { graphicsEnabled } = useGraphicsMode();
+  const { ref, isInView } = useSectionObserver<HTMLElement>();
 
   return (
-    <section id="hero" className="relative overflow-hidden px-4 pb-14 pt-10 sm:px-6 sm:pb-16 lg:px-8">
-      <div className="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
+    <section
+      ref={ref}
+      id="hero"
+      className="relative isolate overflow-hidden px-4 pb-14 pt-10 sm:px-6 sm:pb-16 lg:px-8"
+    >
+      {graphicsEnabled ? (
+        <div className="pointer-events-none absolute inset-0 z-0">
+          <WaveBackground active={isInView} />
+          {/* Lighter overlay so the hero wave reads as bright as the lower
+              WaveZone wave. The hero is only ~one viewport tall, so an overlay
+              matching WaveZone's darker END would over-dim it — keep it light
+              and roughly flat, with a mild bottom fade for the paragraph/
+              buttons and to blend into the countdown section below. */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.15),rgba(3,3,3,0.45))]" />
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute inset-0 z-0 bg-[#030303]" />
+      )}
+
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
         <div className="max-w-3xl space-y-6">
           <motion.p
             initial={reducedMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="font-mono text-[10px] uppercase tracking-[0.48em] text-white/35"
+            className="font-mono text-[10px] font-semibold uppercase tracking-[0.48em] text-white/65"
           >
-            Oct 10-11, 2026 - Kuching, Sarawak - 48 hours
+            Oct 10-11, 2026 - Kuching, Sarawak - 24 hours
           </motion.p>
 
           <motion.h1
@@ -494,7 +535,12 @@ function HeroSection() {
             className="max-w-4xl text-[clamp(3.2rem,11vw,7.8rem)] font-black uppercase leading-[0.86] tracking-[-0.08em] text-white"
           >
             <span className="block">Build the</span>
-            <span className="block text-white/22">future</span>
+            <span
+              className="block text-cyan-300/70"
+              style={{ textShadow: "-0.045em 0 rgba(0,255,255,0.65), 0.045em 0 rgba(0,140,255,0.55)" }}
+            >
+              future
+            </span>
             <span className="block">with AI.</span>
           </motion.h1>
 
@@ -533,7 +579,7 @@ function HeroSection() {
               key={item.label}
               className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-md"
             >
-              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
                 {item.label}
               </p>
               <p className="mt-4 text-2xl font-black uppercase tracking-[-0.05em] text-white">
@@ -553,10 +599,10 @@ function SponsorsSection() {
       <SectionShell
         eyebrow="Sponsors"
         title="Partners coming soon."
-        copy="This section is intentionally present in the launch build, but the logos are placeholders until sponsor assets are confirmed."
+        copy="Sponsor partners will be announced as they're confirmed — check back closer to the event."
       >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {["Logo TBC", "Logo TBC", "Logo TBC", "Logo TBC"].map((label, index) => (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {["Logo TBC", "Logo TBC"].map((label, index) => (
             <div
               key={`${label}-${index}`}
               className="flex min-h-28 items-center justify-center rounded-[24px] border border-white/10 bg-black/30 text-sm uppercase tracking-[0.28em] text-white/28"
@@ -577,6 +623,8 @@ function ScheduleSection() {
     scheduleItems.findIndex((item) => item.id === selectedId)
   );
   const selected = scheduleItems[selectedIndex] ?? scheduleItems[0];
+  const milestoneRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
 
   const goToIndex = (index: number) => {
     const clamped = Math.max(0, Math.min(scheduleItems.length - 1, index));
@@ -586,25 +634,47 @@ function ScheduleSection() {
   const atStart = selectedIndex === 0;
   const atEnd = selectedIndex === scheduleItems.length - 1;
 
+  // The timeline row scrolls horizontally on narrow/mobile viewports (it's
+  // wider than the screen there). Tapping a milestone directly is always
+  // visible already, but the prev/next arrow buttons below can move the
+  // active dot off-screen — scroll it back into view (centered) whichever way
+  // selection changed, so the highlighted point is never hidden. Scrolled
+  // manually via scrollTo (horizontal only), NOT scrollIntoView: that method
+  // walks up to find a scrollable ancestor per axis, and since nothing here
+  // has vertical overflow, its `block` option falls back to the page itself —
+  // which visibly jumped the whole page's scroll position on mount.
+  useEffect(() => {
+    const container = timelineScrollRef.current;
+    const button = milestoneRefs.current[selectedIndex];
+    if (!container || !button) {
+      return;
+    }
+    const target = button.offsetLeft + button.offsetWidth / 2 - container.clientWidth / 2;
+    container.scrollTo({ left: target, behavior: "smooth" });
+  }, [selectedIndex]);
+
   return (
     <SectionReveal id="schedule" className="scroll-mt-28" delay={0.06}>
       <SectionShell
         eyebrow="Schedule"
         title="Key dates."
-        copy="Tap a milestone or use the arrows to update the shared detail card below."
+        copy="Tap a milestone above, or use the arrows, to see its details below."
       >
         <div className="space-y-6">
-          <div className="overflow-x-auto pb-4">
+          <div ref={timelineScrollRef} className="overflow-x-auto pb-4">
             <div className="relative min-w-[620px] px-3 pt-2">
               {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
               <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />
               <div className="grid grid-cols-3 gap-4">
-                {scheduleItems.map((item) => {
+                {scheduleItems.map((item, index) => {
                   const active = item.id === selectedId;
 
                   return (
                     <button
                       key={item.id}
+                      ref={(el) => {
+                        milestoneRefs.current[index] = el;
+                      }}
                       type="button"
                       onClick={() => setSelectedId(item.id)}
                       aria-pressed={active}
@@ -654,25 +724,23 @@ function ScheduleSection() {
             </button>
 
             <div className="min-w-0 flex-1 rounded-[24px] border border-white/10 bg-black/30 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                    Shared detail card
-                  </p>
-                  <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-                    {selected.title}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-3">
-                  {selected.badge ? (
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45">
-                      {selected.badge}
-                    </span>
-                  ) : null}
-                  <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
-                    {selectedIndex + 1} / {scheduleItems.length}
-                  </span>
-                </div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+                Shared detail card
+              </p>
+              <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
+                {selected.title}
+              </h3>
+              <div className="mt-3 flex items-center gap-3">
+                <span
+                  className={`rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45 ${
+                    selected.badge ? "" : "invisible"
+                  }`}
+                >
+                  {selected.badge ?? "Tentative"}
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
+                  {selectedIndex + 1} / {scheduleItems.length}
+                </span>
               </div>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
@@ -704,7 +772,7 @@ function BenefitsSection() {
       <SectionShell
         eyebrow="Benefits & Prizes"
         title="What you win."
-        copy="Real prize details are not ready yet, so the live build shows the actual visible launch copy: To Be Announced."
+        copy="Prize details will be announced closer to the event — stay tuned."
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {benefitCards.map((label, index) => (
@@ -748,14 +816,23 @@ function CollaboratorsSection() {
               name: "AI HackerDorm",
               logo: "/AI-Hackadorm.png",
               copy: "Student-led community focused on building AI capability, momentum, and useful collaboration across the region.",
+              url: "https://www.aihackerdorm.com/",
             },
             {
               name: "Swinburne Sarawak",
               logo: "/Swinburne-Logo.jpg",
               copy: "University partner bringing academic support, venue context, and a pathway to student participation.",
+              url: "https://www.swinburne.edu.my/",
             },
           ].map((item) => (
-            <div key={item.name} className="rounded-[24px] border border-white/10 bg-black/30 p-5">
+            <a
+              key={item.name}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative block rounded-[24px] border border-white/10 bg-black/30 p-5 transition-colors hover:border-white/25 hover:bg-black/40"
+            >
+              <ExternalLink className="absolute right-5 top-5 h-4 w-4 text-white/30 transition-colors group-hover:text-white/70" />
               <div className="flex items-center gap-4">
                 <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5">
                   <Image
@@ -776,7 +853,7 @@ function CollaboratorsSection() {
                 </div>
               </div>
               <p className="mt-4 text-sm leading-7 text-white/55">{item.copy}</p>
-            </div>
+            </a>
           ))}
         </div>
       </SectionShell>
@@ -790,7 +867,7 @@ function AboutSection() {
       <SectionShell
         eyebrow="About Us"
         title="Who we are."
-        copy="This section stays modular so it can grow later without forcing a route change."
+        copy="Meet the community and university partner behind the event."
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {[
@@ -827,7 +904,7 @@ function PartnerSocialSection() {
       <SectionShell
         eyebrow="Partner + Social"
         title="Support the next generation."
-        copy="Partnership inquiries stay lightweight for launch: no form, just direct contact channels and social links."
+        copy="Want to get involved or follow along? Reach out directly or find us on social media."
       >
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
@@ -835,21 +912,14 @@ function PartnerSocialSection() {
               Partnership notice
             </p>
             <h3 className="mt-3 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-              Placeholders only for now.
+              Partnership details coming soon.
             </h3>
             <p className="mt-4 text-sm leading-7 text-white/55">
-              If your organization wants to collaborate, this is the launch placeholder. We will
-              swap in the final sponsor and partnership messaging once those details are confirmed.
+              Interested in partnering with us? We&apos;re finalizing sponsor and collaboration
+              details and will share them soon — reach out via our socials in the meantime.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <PrimaryButton disabled>Coming Soon</PrimaryButton>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
-              >
-                Contact channels
-                <ExternalLink className="h-3.5 w-3.5" />
-              </button>
             </div>
           </div>
 
@@ -870,7 +940,10 @@ function PartnerSocialSection() {
                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/25 text-white/65">
                       {item.label === "Email" ? <Mail className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                     </span>
-                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="flex flex-col">
+                      <span className="text-sm font-medium">{item.label}</span>
+                      <span className="text-xs text-white/45">{item.handle}</span>
+                    </span>
                   </span>
                   <ArrowRight className="h-4 w-4" />
                 </a>

@@ -32,6 +32,15 @@ body {
   min-height: 100vh;
   background: #030303;
   color: #ffffff;
+  /* Chromatic-aberration text fringe: a COOL cyan→blue channel split (NOT
+     red/cyan). A magenta/red warm side reads pink on white text and fights the
+     site's cyan cyberpunk palette — keep both fringes cool so text gets a cyan
+     glitch edge, matching the hero "future" word. Cheap: a static text-shadow
+     (no animation/extra paint). text-shadow inherits, so this covers all text
+     sitewide from one place. em units scale the offset with each element's own
+     font-size, so large display headlines get a bold split while small mono
+     labels get a near-invisible fraction of a pixel instead of turning to mud. */
+  text-shadow: -0.045em 0 rgba(0, 245, 255, 0.55), 0.045em 0 rgba(0, 120, 255, 0.48);
 }
 
 * {

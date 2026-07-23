@@ -13,6 +13,13 @@ const WAVE_MAX_RADIUS = 620;
 const WAVE_SPEED = 300;
 const WAVE_FORCE = 10;
 const WAVE_WIDTH = 50;
+// A WaveZone canvas is as tall as the whole stacked lower section (~2800px)
+// while only ~one viewport is ever on screen. Drawing + physics-stepping all
+// ~23k dots every frame is the site's biggest runtime cost (and Firefox's
+// Canvas2D is much slower than Chrome's at it), so we cull to the on-screen
+// band plus this margin — cutting the per-frame work ~8x with no visible
+// change. The margin lets edge dots settle before they scroll into view.
+const CULL_MARGIN = 140;
 
 interface Dot {
   baseX: number;
@@ -59,7 +66,11 @@ function toCanvasCoords(clientX: number, clientY: number, canvas: HTMLCanvasElem
 }
 
 export default function WaveBackground({
-  dotColor = "rgba(255, 255, 255, 0.34)",
+  // Darker grey (not white) so the dot-wave reads as a subtle, dim texture —
+  // the look the hero had when it was heavily overlaid, but now baked into the
+  // dot colour so BOTH waves match without relying on a heavy per-section
+  // overlay. Tune this single value to make the whole wave lighter/darker.
+  dotColor = "rgba(150, 150, 150, 0.4)",
   ambient = {},
   active = true,
 }: {
@@ -68,7 +79,20 @@ export default function WaveBackground({
   active?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animIdRef = useRef(0);
+  const lastTimeRef = useRef(0);
+  const ambientTimerRef = useRef(0);
+  const loopRef = useRef<(time: number) => void>(() => {});
+  const scheduleAmbientRef = useRef<() => void>(() => {});
 
+  // Setup runs once (plus whenever the ripple-config/color props change) and
+  // owns the dots/ripples state for this canvas's whole lifetime. `active`
+  // is intentionally NOT a dependency here — toggling it (via the effect
+  // below) only starts/stops the loop, it never tears down and re-seeds the
+  // simulation. Otherwise every scroll-out-of-view-and-back resets the wave
+  // to a flat grid, so a section that toggles often (e.g. one gated behind
+  // a big IntersectionObserver target) never accumulates the same busy
+  // ripple field as a wave that's stayed active since page load.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -81,7 +105,6 @@ export default function WaveBackground({
     let mouseX = -10000;
     let mouseY = -10000;
     let mouseOnPage = false;
-    let animId = 0;
     let canvasWidth = window.innerWidth;
     let canvasHeight = window.innerHeight;
 
@@ -192,12 +215,16 @@ export default function WaveBackground({
       }
     };
 
-    const update = (dt: number) => {
+    const update = (dt: number, minY: number, maxY: number) => {
       const clampedDt = Math.min(dt, 32);
       const factor = clampedDt / 16;
 
       for (let i = dots.length - 1; i >= 0; i -= 1) {
         const d = dots[i];
+
+        // Skip physics for off-screen dots — they're at rest anyway, and any
+        // ripple that reaches them is handled once they scroll into the band.
+        if (d.baseY < minY || d.baseY > maxY) continue;
 
         d.vx += (d.baseX - d.x) * SPRING_K;
         d.vy += (d.baseY - d.y) * SPRING_K;
@@ -248,38 +275,43 @@ export default function WaveBackground({
       }
     };
 
-    const draw = () => {
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-      ctx.fillStyle = "#030303";
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    const draw = (minY: number, maxY: number) => {
+      // Repaint (and step) only the visible band, not the whole tall canvas.
+      // The opaque bg fill doubles as the erase, so no separate clearRect.
+      const bandTop = Math.max(0, minY);
+      const bandBottom = Math.min(canvasHeight, maxY);
+      if (bandBottom <= bandTop) return;
 
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = "#030303";
+      ctx.fillRect(0, bandTop, canvasWidth, bandBottom - bandTop);
+
       ctx.fillStyle = dotColor;
       for (let i = 0; i < dots.length; i += 1) {
         const d = dots[i];
+        if (d.baseY < minY || d.baseY > maxY) continue;
         ctx.beginPath();
         ctx.arc(d.x, d.y, DOT_RADIUS, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.restore();
     };
 
-    let lastTime = performance.now();
-    let ambientTimer: number;
+    // Canvas coordinate space equals CSS pixels here (canvas.width is set to
+    // the CSS width, so DPR is 1), so a dot at canvas-y `dy` sits at viewport
+    // `rect.top + dy`. Invert that to get the on-screen band in dot coords.
+    const getVisibleBand = () => {
+      const top = -canvas.getBoundingClientRect().top;
+      return { minY: top - CULL_MARGIN, maxY: top + window.innerHeight + CULL_MARGIN };
+    };
 
     const loop = (time: number) => {
-      if (!active) {
-        draw();
-        return;
-      }
-
-      const dt = time - lastTime;
-      lastTime = time;
-      update(dt);
-      draw();
-      animId = requestAnimationFrame(loop);
+      const dt = time - lastTimeRef.current;
+      lastTimeRef.current = time;
+      const { minY, maxY } = getVisibleBand();
+      update(dt, minY, maxY);
+      draw(minY, maxY);
+      animIdRef.current = requestAnimationFrame(loop);
     };
+    loopRef.current = loop;
 
     const handleMouseMove = (e: MouseEvent) => {
       const coords = toCanvasCoords(e.clientX, e.clientY, canvas);
@@ -312,17 +344,17 @@ export default function WaveBackground({
 
     const scheduleAmbient = () => {
       const delay = intervalMin + Math.random() * (intervalMax - intervalMin);
-      ambientTimer = window.setTimeout(() => {
+      ambientTimerRef.current = window.setTimeout(() => {
         spawnAmbientRipple();
         scheduleAmbient();
       }, delay);
     };
-
-    scheduleAmbient();
-    spawnAmbientRipple();
+    scheduleAmbientRef.current = scheduleAmbient;
 
     resize();
-    animId = requestAnimationFrame(loop);
+    spawnAmbientRipple();
+    // Loop + ambient scheduling are started/stopped by the effect below,
+    // which reacts to `active` without re-running this setup.
 
     const resizeObserver =
       typeof ResizeObserver !== "undefined" && canvas.parentElement
@@ -338,8 +370,8 @@ export default function WaveBackground({
     document.addEventListener("click", handleDocumentClick);
 
     return () => {
-      cancelAnimationFrame(animId);
-      window.clearTimeout(ambientTimer);
+      cancelAnimationFrame(animIdRef.current);
+      window.clearTimeout(ambientTimerRef.current);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", resize);
       window.removeEventListener(WAVE_EVENT, handleCustomRipple);
@@ -348,7 +380,24 @@ export default function WaveBackground({
       document.removeEventListener("mouseleave", handleMouseLeave);
       document.removeEventListener("click", handleDocumentClick);
     };
-  }, [active, ambient.maxRadius, ambient.force, ambient.speed, ambient.intervalMin, ambient.intervalMax, dotColor]);
+  }, [ambient.maxRadius, ambient.force, ambient.speed, ambient.intervalMin, ambient.intervalMax, dotColor]);
+
+  // Starts/stops the already-seeded simulation without resetting it, so
+  // scrolling a wave section out of view and back just pauses/resumes it —
+  // ripples and dot positions pick up exactly where they left off, instead
+  // of the whole field flattening back to a fresh grid.
+  useEffect(() => {
+    if (active) {
+      lastTimeRef.current = performance.now();
+      animIdRef.current = requestAnimationFrame(loopRef.current);
+      scheduleAmbientRef.current();
+    }
+
+    return () => {
+      cancelAnimationFrame(animIdRef.current);
+      window.clearTimeout(ambientTimerRef.current);
+    };
+  }, [active]);
 
   return (
     <canvas

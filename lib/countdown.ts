@@ -25,7 +25,7 @@ export const COUNTDOWN_TARGETS = {
   registration: new Date("2026-09-01T00:00:00"),
   workshop: new Date("2026-10-02T00:00:00"),
   mainEvent: new Date("2026-10-10T00:00:00"),
-  eventEnds: new Date("2026-10-12T00:00:00"),
+  eventEnds: new Date("2026-10-11T00:00:00"),
 } as const;
 
 function remainingUntil(target: Date, now: number) {
@@ -70,7 +70,7 @@ export function getCountdownStage(now = Date.now()): CountdownStage {
       label: "Event Completion",
       target: COUNTDOWN_TARGETS.eventEnds,
       completed: false,
-      message: "48 hours remaining",
+      message: "24 hours remaining",
     };
   }
 
