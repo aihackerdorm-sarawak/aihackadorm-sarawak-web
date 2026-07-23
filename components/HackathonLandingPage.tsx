@@ -624,6 +624,7 @@ function ScheduleSection() {
   );
   const selected = scheduleItems[selectedIndex] ?? scheduleItems[0];
   const milestoneRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
 
   const goToIndex = (index: number) => {
     const clamped = Math.max(0, Math.min(scheduleItems.length - 1, index));
@@ -636,14 +637,20 @@ function ScheduleSection() {
   // The timeline row scrolls horizontally on narrow/mobile viewports (it's
   // wider than the screen there). Tapping a milestone directly is always
   // visible already, but the prev/next arrow buttons below can move the
-  // active dot off-screen — scroll it back into view (centered) whichever
-  // way selection changed, so the highlighted point is never hidden.
+  // active dot off-screen — scroll it back into view (centered) whichever way
+  // selection changed, so the highlighted point is never hidden. Scrolled
+  // manually via scrollTo (horizontal only), NOT scrollIntoView: that method
+  // walks up to find a scrollable ancestor per axis, and since nothing here
+  // has vertical overflow, its `block` option falls back to the page itself —
+  // which visibly jumped the whole page's scroll position on mount.
   useEffect(() => {
-    milestoneRefs.current[selectedIndex]?.scrollIntoView({
-      behavior: "smooth",
-      inline: "center",
-      block: "nearest",
-    });
+    const container = timelineScrollRef.current;
+    const button = milestoneRefs.current[selectedIndex];
+    if (!container || !button) {
+      return;
+    }
+    const target = button.offsetLeft + button.offsetWidth / 2 - container.clientWidth / 2;
+    container.scrollTo({ left: target, behavior: "smooth" });
   }, [selectedIndex]);
 
   return (
@@ -654,7 +661,7 @@ function ScheduleSection() {
         copy="Tap a milestone above, or use the arrows, to see its details below."
       >
         <div className="space-y-6">
-          <div className="overflow-x-auto pb-4">
+          <div ref={timelineScrollRef} className="overflow-x-auto pb-4">
             <div className="relative min-w-[620px] px-3 pt-2">
               {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
               <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />

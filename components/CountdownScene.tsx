@@ -1288,7 +1288,12 @@ function CountdownDigits({
     );
     return settings.sceneOffsetY - headerWorldHeight * 0.08;
   }, [cameraViewportHeight, headerHeightPx, settings.sceneOffsetY, viewportHeight]);
-  const pointerWorld = useRef(new Vector3(0, 0, 0));
+  // Parked off-canvas (matches handlePointerLeave below), NOT world origin —
+  // (0,0,0) sits dead-center of the countdown, so before any real pointer
+  // event ever fires (e.g. the mouse hasn't touched the canvas since load),
+  // the hover shader read that as "cursor is here" and phantom-hovered the
+  // middle dots (magnify/repel/chromatic fringe) with no cursor present.
+  const pointerWorld = useRef(new Vector3(999, 999, 999));
   const hitPlaneScale = useMemo(
     () => [settings.sceneWidth, settings.sceneHeight, 1] as const,
     [settings.sceneHeight, settings.sceneWidth]
