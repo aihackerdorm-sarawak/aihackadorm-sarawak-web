@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
@@ -245,24 +245,35 @@ function CountdownWebGLFrame({
       return;
     }
 
-    const update = (entry: ResizeObserverEntry) => {
-      setContainerWidthPx(entry.contentRect.width);
-      setContainerHeightPx(entry.contentRect.height);
+    const commit = (width: number, height: number) => {
+      setContainerWidthPx(width);
+      setContainerHeightPx(height);
     };
 
+    // Debounce: the container size drives sceneWidth/Height, which are part of
+    // the digit-group structural key, so committing every intermediate resize
+    // size re-samples all the digit/label text (8 offscreen canvases +
+    // getImageData) per frame during a drag. Commit only once it settles; the
+    // initial size below is applied immediately so first paint is correct.
+    let timer: number;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) {
-        update(entry);
+      if (!entry) {
+        return;
       }
+      const { width, height } = entry.contentRect;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => commit(width, height), 150);
     });
 
     const rect = element.getBoundingClientRect();
-    setContainerWidthPx(rect.width);
-    setContainerHeightPx(rect.height);
+    commit(rect.width, rect.height);
     observer.observe(element);
 
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
   }, []);
 
   return (
@@ -369,6 +380,10 @@ function CountdownFallback({
   );
 }
 
+// Stable no-op subscribe for the client-mount check below (useSyncExternalStore
+// requires a referentially stable subscribe).
+const subscribeNoop = () => () => {};
+
 function CountdownSection() {
   const reducedMotion = useReducedMotion() ?? true;
   const { graphicsEnabled } = useGraphicsMode();
@@ -376,17 +391,23 @@ function CountdownSection() {
   const { stage, values } = useCountdownState();
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeightPx, setHeaderHeightPx] = useState(0);
-  const [isMounted, setIsMounted] = useState(false);
-  const [quality, setQuality] = useState<QualityTier>("medium");
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setIsMounted(true);
-      setQuality(getDeviceQuality());
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
+  // Client-only mount gate for the WebGL countdown. Was previously an
+  // isMounted flag flipped inside requestAnimationFrame — but rAF is
+  // throttled/paused in a background or unfocused tab, so the countdown stayed
+  // absent until the tab was focused. useSyncExternalStore returns false on
+  // the server + during hydration and true once mounted, hydration-safe and
+  // NOT tied to frame timing. Quality is device-based and never changes, so a
+  // lazy useState initializer computes it once (returns "medium" on the
+  // server, where getDeviceQuality can't touch navigator/matchMedia).
+  const isMounted = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  );
+  const [quality] = useState<QualityTier>(() =>
+    typeof window === "undefined" ? "medium" : getDeviceQuality()
+  );
 
   useEffect(() => {
     const element = headerRef.current;
@@ -486,7 +507,12 @@ function HeroSection() {
       {graphicsEnabled ? (
         <div className="pointer-events-none absolute inset-0 z-0">
           <WaveBackground active={isInView} />
-          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.4),rgba(3,3,3,0.72))]" />
+          {/* Lighter overlay so the hero wave reads as bright as the lower
+              WaveZone wave. The hero is only ~one viewport tall, so an overlay
+              matching WaveZone's darker END would over-dim it — keep it light
+              and roughly flat, with a mild bottom fade for the paragraph/
+              buttons and to blend into the countdown section below. */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.15),rgba(3,3,3,0.45))]" />
         </div>
       ) : (
         <div className="pointer-events-none absolute inset-0 z-0 bg-[#030303]" />

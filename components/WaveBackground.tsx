@@ -66,7 +66,11 @@ function toCanvasCoords(clientX: number, clientY: number, canvas: HTMLCanvasElem
 }
 
 export default function WaveBackground({
-  dotColor = "rgba(255, 255, 255, 0.34)",
+  // Darker grey (not white) so the dot-wave reads as a subtle, dim texture —
+  // the look the hero had when it was heavily overlaid, but now baked into the
+  // dot colour so BOTH waves match without relying on a heavy per-section
+  // overlay. Tune this single value to make the whole wave lighter/darker.
+  dotColor = "rgba(150, 150, 150, 0.4)",
   ambient = {},
   active = true,
 }: {

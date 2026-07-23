@@ -194,16 +194,32 @@ function hash01(seed: number) {
   return value - Math.floor(value);
 }
 
+// How long the window must be still before a resize is committed. A live
+// resize would otherwise re-render the countdown on every intermediate size,
+// each time recomputing settings and re-running the structural effect that
+// rebuilds 8 offscreen canvases + getImageData. We sync once immediately on
+// mount, then only after the drag settles.
+const RESIZE_DEBOUNCE_MS = 150;
+
 function useViewportWidth() {
   const [width, setWidth] = useState(() =>
     typeof window === "undefined" ? 1024 : window.innerWidth
   );
 
   useEffect(() => {
-    const update = () => setWidth(window.innerWidth);
-    update();
+    // No immediate sync needed: the useState initializer already reads
+    // window.innerWidth on the client, and this hook only runs client-side
+    // (the countdown mounts after isMounted), so there's no SSR value to fix.
+    let timer: number;
+    const update = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setWidth(window.innerWidth), RESIZE_DEBOUNCE_MS);
+    };
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   return width;
@@ -215,10 +231,17 @@ function useViewportHeight() {
   );
 
   useEffect(() => {
-    const update = () => setHeight(window.innerHeight);
-    update();
+    // See useViewportWidth — the initializer covers the initial client value.
+    let timer: number;
+    const update = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setHeight(window.innerHeight), RESIZE_DEBOUNCE_MS);
+    };
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", update);
+    };
   }, []);
 
   return height;
@@ -1284,12 +1307,24 @@ function CountdownDigits({
     [countdown.days, countdown.hours, countdown.minutes, countdown.seconds]
   );
 
+  // The fitted font depends only on the longest value's LENGTH (Arial Black
+  // digits are tabular / equal width), not on the specific digits — so key the
+  // fit on that length, not on `values` which change every second, to avoid
+  // re-running the binary-search measureText fit on every tick.
+  const maxValueLength = useMemo(
+    () => values.reduce((longest, value) => Math.max(longest, value.length), 1),
+    [values]
+  );
+
   const fonts = useMemo(() => {
     if (!measureCtx) {
       return { valueFont: settings.fontSize, labelFont: 28 };
     }
-    return computeFontSizes(measureCtx, values, stacked, settings);
-  }, [measureCtx, values, stacked, settings]);
+    // A representative all-'0' string of the longest length stands in for the
+    // fit (same width as any real value of that length).
+    const representative = "0".repeat(maxValueLength);
+    return computeFontSizes(measureCtx, [representative], stacked, settings);
+  }, [measureCtx, maxValueLength, stacked, settings]);
 
   useFrame((state) => {
     state.camera.position.z = MathUtils.lerp(state.camera.position.z, cameraZ, 0.06);

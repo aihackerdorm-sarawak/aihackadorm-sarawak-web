@@ -63,18 +63,51 @@ Rules & gotchas (hard-won — don't relearn these):
   `AdditiveBlending` (SRC_ALPHA,ONE) that makes the off-hover result identical
   to the plain dot, so hover adds NOTHING until the cursor is near. Don't
   "restore" a brightness/white term — the ask was chromatic aberration, not glow.
+  The chromatic split re-samples the disc (`dotAlpha`) 3×, so it's guarded by
+  `if (vChroma > 0.001)` — non-hovered fragments (i.e. ALL of them when idle)
+  do a SINGLE sample. `vChroma` is constant per point-sprite so the branch is
+  coherent (no GPU divergence). Do NOT unconditionalize the 3× sampling — it
+  tripled fragment fill-rate for the whole timer every frame.
 - Idle-skip: the per-frame particle loop early-returns once settled (no motion,
   no flash), but `uTime` keeps updating so the twinkle/wave never freeze.
 - Per-digit flash-on-change is scoped to the changed digit's slot range via
   `baseSizes` — never flash the whole segment (looks like a glitch).
+- **Lifecycle & resize perf** (don't regress):
+  - Mount gate uses `useSyncExternalStore` (false on server/hydration, true
+    once mounted), NOT an `isMounted` flag set in `requestAnimationFrame` — rAF
+    is paused in a background/unfocused tab, which left the countdown absent
+    until focus. `quality` is a lazy `useState` initializer (device-based,
+    computed once). This also dodges the `react-hooks/set-state-in-effect` lint
+    rule (enforced as an ERROR here — never call `setState` synchronously in an
+    effect body; use a lazy initializer, `useSyncExternalStore`, or an async
+    callback).
+  - `useViewportWidth/Height` (in `CountdownScene.tsx`) and the container
+    `ResizeObserver` (in `CountdownWebGLFrame`) are **debounced 150ms**. A live
+    resize otherwise re-runs the digit-group structural effect (which rebuilds
+    ~8 offscreen canvases + `getImageData`) on every intermediate size. First
+    paint still uses the immediate initial size, so no startup delay.
+  - The `fonts` fit (`computeFontSizes` binary-search + `measureText`) is keyed
+    on the longest value's LENGTH, not on `values` (which change every second) —
+    Arial Black digits are tabular so the fit only depends on length.
 
 ## Other components
 - `SiteHeader.tsx` — desktop nav is `hidden lg:flex`; below `lg` a working
   hamburger dropdown menu handles navigation.
 - Hero (in `HackathonLandingPage.tsx`) and the lower `WaveZone` each render a
   `WaveBackground` dot-wave, gated on the Graphics toggle + in-view. Both use
-  the identical component/defaults — if they ever look different, suspect the
-  active/observer wiring, not two configs.
+  the identical component/defaults, so **wave brightness is controlled by the
+  shared `dotColor` default** — deliberately a darker grey
+  (`rgba(150,150,150,0.4)`, not white) for a subtle, dim texture. Change that
+  one value to make BOTH waves lighter/darker together; that's the primary knob
+  and keeps the two sections consistent by construction.
+- Each wave also has a dark **gradient-overlay `<div>`** on top (for text
+  legibility) — a secondary, per-section dim. WaveZone `rgba(3,3,3,0.12)→0.78`
+  (stretched over its ~2825px height, so its visible band stays near the light
+  end); the hero, only ~one viewport tall, uses a lighter/flatter `0.15→0.45`
+  (NOT the same string — matching WaveZone's dark end would over-dim a short
+  section). If the two waves ever look mismatched, check `dotColor` first (it's
+  shared, so it's rarely the cause), then these overlays — never suspect the
+  wave/observer wiring, which is identical.
 - `WaveBackground.tsx` (2D canvas) perf & structure — hard-won, keep:
   - Split into two effects. The **setup** effect (deps: `dotColor`/`ambient`)
     seeds `dots`/`ripples` once and owns them for the canvas's life. The
@@ -108,12 +141,54 @@ Rules & gotchas (hard-won — don't relearn these):
   `eventEnds` both now agree on 24 hours.)
 - `lib/countdown.ts` target dates parse in the viewer's local time (no `+08:00`)
   → wrong countdown for anyone outside UTC+8.
-- `CountdownSection` gates render on `isMounted` set inside a
-  `requestAnimationFrame` → countdown is absent in a background/unfocused tab
-  until it's focused. Fix = set `isMounted` in a plain `useEffect`.
 - Dead/unused code: `Hero.tsx`, `HeroScene.tsx`, `ContentSections.tsx`,
-  `PartnerForm.tsx`, `CountdownHero.tsx`, `app/api/contact/route.ts`.
+  `PartnerForm.tsx`, `CountdownHero.tsx`, `app/api/contact/route.ts`. Kept
+  deliberately (may be reused) — do NOT delete without asking. `Hero`/
+  `HeroScene` reference each other; `CountdownLabels` in
+  `HackathonLandingPage.tsx` is also unused (source of the one standing eslint
+  `no-unused-vars` warning) but intentionally retained.
+- `@react-three/postprocessing` is a dependency but imported nowhere — unused,
+  left in `package.json` for now.
+- `Swinburne-Logo.jpg` is ~784KB for a 64px logo. `next/image` optimizes
+  delivery (this is a normal server build, not `output: 'export'`, so clients
+  don't get it raw) but the source bloats the repo / first optimize pass;
+  worth recompressing to ~15KB.
 - No web font is actually loaded (globals.css references `--font-geist-*` but
   `next/font` is never imported); metadata is thin (no OpenGraph/viewport).
 - Netlify deploys `main`; the timer/header/wave work lives on
   `wavedot-noah-testbranch` — it must be merged to `main` to go live.
+
+## Session status (for the next session to confirm)
+
+Recent pass focused on the countdown hover feel + perf. All changes are on
+`wavedot-noah-testbranch`, NOT committed/merged yet, and verified only in the
+local dev server + a one-off prod build (`npm run build` / `PORT=xxxx npm run
+start`), not on Netlify. To confirm: run `npm run dev`, scroll to the countdown,
+hover a digit (dots should swell + repel + show a faint red/cyan fringe, no
+white glow), then check `npx tsc --noEmit` and `npx eslint` are clean (one known
+`CountdownLabels` no-unused-vars warning is expected).
+
+Landed this session (all reflected in the notes above):
+- Countdown hover reworked to the magnifying-glass lens (repel + magnify +
+  chromatic aberration), white glow removed, three independent radii.
+- Fragment-shader fill-rate guard (`if (vChroma > 0.001)`) — the big GPU win.
+- Resize debounced (viewport hooks + container `ResizeObserver`), font-fit memo
+  keyed on value length, mount gate moved to `useSyncExternalStore`.
+- Earlier in the session: cyan recolor + single-pass digits, label legibility
+  (`sampleLabelGrid` coverage sampling, `LABEL_FONT_FAMILY`), labels DAY/HOUR/
+  MIN/SEC (singular), faster spring settle, sitewide chromatic-aberration text
+  in `globals.css`, cyan section eyebrows, hero "future" cyan, `WaveBackground`
+  culling/persist-state fixes, 24h copy alignment, sponsor/prize placeholder
+  trim, clickable organizer cards, schedule-card constant height.
+
+Observed but NOT chased (looked like dev-only noise): occasional
+`THREE.WebGLRenderer: Context Lost` in the console during the long dev session
+(many hot-reloads + multiple live WebGL/canvas contexts). It recovers and the
+countdown keeps rendering; it is NOT triggered by app logic. If it recurs in a
+FRESH production tab under normal use, investigate WebGL context-loss/restore
+handling then — otherwise treat as dev churn.
+
+The dev-server `lightningcss` win32 native-binary error at session start was an
+environment issue (arm64 binary present, machine is x64), fixed by deleting
+`node_modules` + `package-lock.json` and reinstalling. If `npm run dev` fails on
+`Cannot find module '../lightningcss.win32-x64-msvc.node'`, do a clean reinstall.
