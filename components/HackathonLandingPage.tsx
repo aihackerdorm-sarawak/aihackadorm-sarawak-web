@@ -4,7 +4,7 @@ import { Component, useEffect, useRef, useState, useSyncExternalStore } from "re
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, ChevronLeft, ChevronRight, Mail, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Mail, Sparkles, Trophy } from "lucide-react";
 import { GraphicsModeProvider, useGraphicsMode } from "./GraphicsMode";
 import { SectionReveal } from "./SectionReveal";
 import { SiteFooter } from "./SiteFooter";
@@ -623,6 +623,7 @@ function ScheduleSection() {
     scheduleItems.findIndex((item) => item.id === selectedId)
   );
   const selected = scheduleItems[selectedIndex] ?? scheduleItems[0];
+  const milestoneRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const goToIndex = (index: number) => {
     const clamped = Math.max(0, Math.min(scheduleItems.length - 1, index));
@@ -631,6 +632,19 @@ function ScheduleSection() {
 
   const atStart = selectedIndex === 0;
   const atEnd = selectedIndex === scheduleItems.length - 1;
+
+  // The timeline row scrolls horizontally on narrow/mobile viewports (it's
+  // wider than the screen there). Tapping a milestone directly is always
+  // visible already, but the prev/next arrow buttons below can move the
+  // active dot off-screen — scroll it back into view (centered) whichever
+  // way selection changed, so the highlighted point is never hidden.
+  useEffect(() => {
+    milestoneRefs.current[selectedIndex]?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [selectedIndex]);
 
   return (
     <SectionReveal id="schedule" className="scroll-mt-28" delay={0.06}>
@@ -645,12 +659,15 @@ function ScheduleSection() {
               {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
               <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />
               <div className="grid grid-cols-3 gap-4">
-                {scheduleItems.map((item) => {
+                {scheduleItems.map((item, index) => {
                   const active = item.id === selectedId;
 
                   return (
                     <button
                       key={item.id}
+                      ref={(el) => {
+                        milestoneRefs.current[index] = el;
+                      }}
                       type="button"
                       onClick={() => setSelectedId(item.id)}
                       aria-pressed={active}
@@ -806,8 +823,9 @@ function CollaboratorsSection() {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block rounded-[24px] border border-white/10 bg-black/30 p-5 transition-colors hover:border-white/25 hover:bg-black/40"
+              className="group relative block rounded-[24px] border border-white/10 bg-black/30 p-5 transition-colors hover:border-white/25 hover:bg-black/40"
             >
+              <ExternalLink className="absolute right-5 top-5 h-4 w-4 text-white/30 transition-colors group-hover:text-white/70" />
               <div className="flex items-center gap-4">
                 <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5">
                   <Image
