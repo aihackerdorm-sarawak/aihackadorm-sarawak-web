@@ -15,7 +15,9 @@ bloom-heavy look, so `uSoftness`/`uGlowInner`/`uGlowOuter` blend a soft edge
 into one sprite instead of drawing a second, larger, dimmer halo pass).
 `PALETTE` is cyan-toned (`#a5f3fc`/`#22d3ee`/`#0891b2`) to match the site's
 cyan cyberpunk accent (see the "future" word in the hero and the global
-chromatic-aberration text-shadow in `globals.css`) — still NOT postprocessing
+chromatic-aberration text-shadow in `globals.css` — a COOL cyan→blue split,
+NOT red/cyan: a warm/magenta side reads pink on white text and fights the
+palette, so don't reintroduce one) — still NOT postprocessing
 bloom, still cheap. On a value change, dots are matched to the nearest new
 target (`assignNearestTargets`) and eased in with a damped spring (momentum +
 slight overshoot), not a linear lerp.
