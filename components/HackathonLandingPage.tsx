@@ -60,19 +60,12 @@ const scheduleItems: ScheduleItem[] = [
     hint: "Build begins",
     title: "Main event begins",
     copy:
-      "The main hackathon start date. The countdown then shifts into the 48-hour live event window until completion.",
-    status: "2-day event",
+      "The main hackathon start date. The countdown then shifts into the 24-hour live event window until completion.",
+    status: "1-day event",
   },
 ];
 
-const benefitCards = [
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-  "To Be Announced",
-];
+const benefitCards = ["To Be Announced", "To Be Announced", "To Be Announced"];
 
 const partnerLinks = [
   { label: "LinkedIn", href: "https://www.linkedin.com/in/borneo-hackathon-6b80bb421" },
@@ -140,8 +133,16 @@ function useSectionObserver<T extends HTMLElement>() {
           setIsInView(entry.isIntersecting);
         }
       },
+      // threshold is a fraction of the observed element's OWN height, not the
+      // viewport — fine for a section roughly one viewport tall (Hero), but
+      // WaveZone wraps six stacked subsections (~2800px), so 8% of that is
+      // ~225px and the wave stayed frozen at active=false until deep into a
+      // scroll. threshold: 0 fires on any intersection regardless of the
+      // target's size; rootMargin pre-activates just before it's on screen
+      // so there's no visible pop-in.
       {
-        threshold: 0.08,
+        threshold: 0,
+        rootMargin: "200px 0px",
       }
     );
 
@@ -166,7 +167,7 @@ function SectionShell({
   return (
     <div className="rounded-[30px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur-md sm:p-7">
       <div className="max-w-3xl space-y-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-white/35">{eyebrow}</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60">{eyebrow}</p>
         <h2 className="text-3xl font-black uppercase tracking-[-0.06em] text-white sm:text-5xl">
           {title}
         </h2>
@@ -205,10 +206,10 @@ function CountdownLabels() {
     <div className="pointer-events-none absolute inset-x-0 top-4 z-20 px-4 sm:top-5 sm:px-6">
       <div className="grid gap-4 text-center md:grid-cols-4">
         {[
-          ["days", "Days"],
-          ["hours", "Hours"],
-          ["minutes", "Mins"],
-          ["seconds", "Secs"],
+          ["days", "Day"],
+          ["hours", "Hour"],
+          ["minutes", "Min"],
+          ["seconds", "Sec"],
         ].map(([key, label]) => (
           <div key={key} className="space-y-2">
             <div className="font-mono text-[10px] uppercase tracking-[0.42em] text-white/42">
@@ -350,10 +351,10 @@ function CountdownFallback({
   return (
     <div className="grid gap-4 rounded-[30px] border border-white/10 bg-black/35 p-5 text-center sm:grid-cols-4 sm:gap-5 sm:p-7">
       {[
-        ["days", "Days"],
-        ["hours", "Hours"],
-        ["minutes", "Mins"],
-        ["seconds", "Secs"],
+        ["days", "Day"],
+        ["hours", "Hour"],
+        ["minutes", "Min"],
+        ["seconds", "Sec"],
       ].map(([key, label]) => (
         <div key={key} className="rounded-[24px] border border-white/10 bg-white/[0.035] px-4 py-5">
           <div className="text-[clamp(2.1rem,8vw,4rem)] font-black leading-none tracking-[-0.08em] text-white">
@@ -418,7 +419,7 @@ function CountdownSection() {
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <div ref={headerRef} className="max-w-4xl space-y-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-white/35">
+          <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60">
             Countdown
           </p>
           <h2 className="text-4xl font-black uppercase tracking-[-0.08em] text-white sm:text-6xl lg:text-7xl">
@@ -427,7 +428,7 @@ function CountdownSection() {
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
             {stage.eyebrow}.{" "}
             {stage.phase === "event-live"
-              ? "The final phase is a 48-hour live event window before the page flips to the completed state."
+              ? "The final phase is a 24-hour live event window before the page flips to the completed state."
               : "The chain advances automatically from registration, to workshop, to the main event, and then to completion."}
           </p>
         </div>
@@ -497,9 +498,9 @@ function HeroSection() {
             initial={reducedMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="font-mono text-[10px] uppercase tracking-[0.48em] text-white/35"
+            className="font-mono text-[10px] font-semibold uppercase tracking-[0.48em] text-white/65"
           >
-            Oct 10-11, 2026 - Kuching, Sarawak - 48 hours
+            Oct 10-11, 2026 - Kuching, Sarawak - 24 hours
           </motion.p>
 
           <motion.h1
@@ -509,7 +510,12 @@ function HeroSection() {
             className="max-w-4xl text-[clamp(3.2rem,11vw,7.8rem)] font-black uppercase leading-[0.86] tracking-[-0.08em] text-white"
           >
             <span className="block">Build the</span>
-            <span className="block text-white/22">future</span>
+            <span
+              className="block text-cyan-300/70"
+              style={{ textShadow: "-0.045em 0 rgba(0,255,255,0.65), 0.045em 0 rgba(0,140,255,0.55)" }}
+            >
+              future
+            </span>
             <span className="block">with AI.</span>
           </motion.h1>
 
@@ -548,7 +554,7 @@ function HeroSection() {
               key={item.label}
               className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-md"
             >
-              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
                 {item.label}
               </p>
               <p className="mt-4 text-2xl font-black uppercase tracking-[-0.05em] text-white">
@@ -570,8 +576,8 @@ function SponsorsSection() {
         title="Partners coming soon."
         copy="This section is intentionally present in the launch build, but the logos are placeholders until sponsor assets are confirmed."
       >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {["Logo TBC", "Logo TBC", "Logo TBC", "Logo TBC"].map((label, index) => (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {["Logo TBC", "Logo TBC"].map((label, index) => (
             <div
               key={`${label}-${index}`}
               className="flex min-h-28 items-center justify-center rounded-[24px] border border-white/10 bg-black/30 text-sm uppercase tracking-[0.28em] text-white/28"
@@ -669,25 +675,23 @@ function ScheduleSection() {
             </button>
 
             <div className="min-w-0 flex-1 rounded-[24px] border border-white/10 bg-black/30 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                    Shared detail card
-                  </p>
-                  <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-                    {selected.title}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-3">
-                  {selected.badge ? (
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45">
-                      {selected.badge}
-                    </span>
-                  ) : null}
-                  <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
-                    {selectedIndex + 1} / {scheduleItems.length}
-                  </span>
-                </div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+                Shared detail card
+              </p>
+              <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
+                {selected.title}
+              </h3>
+              <div className="mt-3 flex items-center gap-3">
+                <span
+                  className={`rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45 ${
+                    selected.badge ? "" : "invisible"
+                  }`}
+                >
+                  {selected.badge ?? "Tentative"}
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
+                  {selectedIndex + 1} / {scheduleItems.length}
+                </span>
               </div>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
@@ -763,14 +767,22 @@ function CollaboratorsSection() {
               name: "AI HackerDorm",
               logo: "/AI-Hackadorm.png",
               copy: "Student-led community focused on building AI capability, momentum, and useful collaboration across the region.",
+              url: "https://www.aihackerdorm.com/",
             },
             {
               name: "Swinburne Sarawak",
               logo: "/Swinburne-Logo.jpg",
               copy: "University partner bringing academic support, venue context, and a pathway to student participation.",
+              url: "https://www.swinburne.edu.my/",
             },
           ].map((item) => (
-            <div key={item.name} className="rounded-[24px] border border-white/10 bg-black/30 p-5">
+            <a
+              key={item.name}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-[24px] border border-white/10 bg-black/30 p-5 transition-colors hover:border-white/25 hover:bg-black/40"
+            >
               <div className="flex items-center gap-4">
                 <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5">
                   <Image
@@ -791,7 +803,7 @@ function CollaboratorsSection() {
                 </div>
               </div>
               <p className="mt-4 text-sm leading-7 text-white/55">{item.copy}</p>
-            </div>
+            </a>
           ))}
         </div>
       </SectionShell>

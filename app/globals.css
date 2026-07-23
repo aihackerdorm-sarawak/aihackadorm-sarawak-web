@@ -32,6 +32,13 @@ body {
   min-height: 100vh;
   background: #030303;
   color: #ffffff;
+  /* Chromatic-aberration text fringe: red/cyan channel split, cheap since
+     it's a static text-shadow (no animation, no extra DOM/paint per frame).
+     text-shadow inherits, so this covers all text sitewide from one place.
+     em units scale the offset with each element's own font-size, so large
+     display headlines get a bold RGB-split glitch while small mono labels
+     get a near-invisible fraction of a pixel instead of turning to mud. */
+  text-shadow: -0.045em 0 rgba(255, 30, 90, 0.6), 0.045em 0 rgba(0, 220, 255, 0.6);
 }
 
 * {
