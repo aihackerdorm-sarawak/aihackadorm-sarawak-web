@@ -4,7 +4,7 @@ import { Component, useEffect, useRef, useState, useSyncExternalStore } from "re
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Mail, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Mail, Sparkles, Trophy } from "lucide-react";
 import { GraphicsModeProvider, useGraphicsMode } from "./GraphicsMode";
 import { SectionReveal } from "./SectionReveal";
 import { SiteFooter } from "./SiteFooter";
@@ -68,9 +68,8 @@ const scheduleItems: ScheduleItem[] = [
 const benefitCards = ["To Be Announced", "To Be Announced", "To Be Announced"];
 
 const partnerLinks = [
-  { label: "LinkedIn", href: "https://www.linkedin.com/in/borneo-hackathon-6b80bb421" },
-  { label: "Instagram", href: "https://www.instagram.com/ai_hackerdorm_sarawak/" },
-  { label: "Email", href: "mailto:example@gmail.com" },
+  { label: "Instagram", handle: "@aihackerdorm.sarawak", href: "https://www.instagram.com/aihackerdorm.sarawak/" },
+  { label: "Email", handle: "example@gmail.com", href: "mailto:example@gmail.com" },
 ];
 
 function useScrollToId() {
@@ -449,8 +448,8 @@ function CountdownSection() {
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
             {stage.eyebrow}.{" "}
             {stage.phase === "event-live"
-              ? "The final phase is a 24-hour live event window before the page flips to the completed state."
-              : "The chain advances automatically from registration, to workshop, to the main event, and then to completion."}
+              ? "The main event is live — 24 hours on the clock until it wraps up."
+              : "This page updates automatically as each milestone — registration, the workshop, and the main event — arrives."}
           </p>
         </div>
 
@@ -600,7 +599,7 @@ function SponsorsSection() {
       <SectionShell
         eyebrow="Sponsors"
         title="Partners coming soon."
-        copy="This section is intentionally present in the launch build, but the logos are placeholders until sponsor assets are confirmed."
+        copy="Sponsor partners will be announced as they're confirmed — check back closer to the event."
       >
         <div className="grid gap-4 sm:grid-cols-2">
           {["Logo TBC", "Logo TBC"].map((label, index) => (
@@ -638,7 +637,7 @@ function ScheduleSection() {
       <SectionShell
         eyebrow="Schedule"
         title="Key dates."
-        copy="Tap a milestone or use the arrows to update the shared detail card below."
+        copy="Tap a milestone above, or use the arrows, to see its details below."
       >
         <div className="space-y-6">
           <div className="overflow-x-auto pb-4">
@@ -749,7 +748,7 @@ function BenefitsSection() {
       <SectionShell
         eyebrow="Benefits & Prizes"
         title="What you win."
-        copy="Real prize details are not ready yet, so the live build shows the actual visible launch copy: To Be Announced."
+        copy="Prize details will be announced closer to the event — stay tuned."
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {benefitCards.map((label, index) => (
@@ -843,7 +842,7 @@ function AboutSection() {
       <SectionShell
         eyebrow="About Us"
         title="Who we are."
-        copy="This section stays modular so it can grow later without forcing a route change."
+        copy="Meet the community and university partner behind the event."
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {[
@@ -880,7 +879,7 @@ function PartnerSocialSection() {
       <SectionShell
         eyebrow="Partner + Social"
         title="Support the next generation."
-        copy="Partnership inquiries stay lightweight for launch: no form, just direct contact channels and social links."
+        copy="Want to get involved or follow along? Reach out directly or find us on social media."
       >
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
@@ -888,21 +887,14 @@ function PartnerSocialSection() {
               Partnership notice
             </p>
             <h3 className="mt-3 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-              Placeholders only for now.
+              Partnership details coming soon.
             </h3>
             <p className="mt-4 text-sm leading-7 text-white/55">
-              If your organization wants to collaborate, this is the launch placeholder. We will
-              swap in the final sponsor and partnership messaging once those details are confirmed.
+              Interested in partnering with us? We&apos;re finalizing sponsor and collaboration
+              details and will share them soon — reach out via our socials in the meantime.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <PrimaryButton disabled>Coming Soon</PrimaryButton>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
-              >
-                Contact channels
-                <ExternalLink className="h-3.5 w-3.5" />
-              </button>
             </div>
           </div>
 
@@ -923,7 +915,10 @@ function PartnerSocialSection() {
                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/25 text-white/65">
                       {item.label === "Email" ? <Mail className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                     </span>
-                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="flex flex-col">
+                      <span className="text-sm font-medium">{item.label}</span>
+                      <span className="text-xs text-white/45">{item.handle}</span>
+                    </span>
                   </span>
                   <ArrowRight className="h-4 w-4" />
                 </a>
