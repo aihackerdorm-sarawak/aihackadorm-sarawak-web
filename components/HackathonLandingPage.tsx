@@ -1038,7 +1038,7 @@ function LandingContent() {
       <div className="pointer-events-none fixed inset-0 z-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:72px_72px] opacity-30" />
 
       <div className="relative z-10">
-        <SiteHeader onNavigate={navigate} />
+        <SiteHeader onNavigate={navigate} stage={countdown.stage} />
         <HeroSection stage={countdown.stage} />
         <CountdownSection stage={countdown.stage} values={countdown.values} />
         <WaveZone />

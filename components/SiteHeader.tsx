@@ -4,9 +4,11 @@ import { useState } from "react";
 import Image from "next/image";
 import { ChevronDown, Menu, Sparkles, X } from "lucide-react";
 import { useGraphicsMode } from "./GraphicsMode";
+import type { CountdownStage } from "@/lib/countdown";
 
 type SiteHeaderProps = {
   onNavigate: (id: string) => void;
+  stage: CountdownStage;
 };
 
 const navItems = [
@@ -31,9 +33,26 @@ function LogoMark() {
   );
 }
 
-export function SiteHeader({ onNavigate }: SiteHeaderProps) {
+function getHeaderCta(stage: CountdownStage) {
+  if (stage.phase === "registration") {
+    return {
+      label: "Coming Soon",
+      disabled: true,
+      href: undefined,
+    } as const;
+  }
+
+  return {
+    label: "Register",
+    disabled: false,
+    href: "https://google.com",
+  } as const;
+}
+
+export function SiteHeader({ onNavigate, stage }: SiteHeaderProps) {
   const { graphicsEnabled, toggleGraphics } = useGraphicsMode();
   const [menuOpen, setMenuOpen] = useState(false);
+  const cta = getHeaderCta(stage);
 
   const handleNavigate = (id: string) => {
     setMenuOpen(false);
@@ -85,14 +104,27 @@ export function SiteHeader({ onNavigate }: SiteHeaderProps) {
             <span>{graphicsEnabled ? "On" : "Off"}</span>
           </button>
 
-          <a
-            href="https://google.com"
-            className="register-cta hidden items-center gap-1.5 rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-85 sm:inline-flex sm:px-4 sm:py-2 sm:text-[11px]"
-            data-text="Register"
-          >
-            <span>Register</span>
-            <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-          </a>
+          {cta.disabled ? (
+            <button
+              type="button"
+              disabled
+              title="Coming Soon"
+              className="register-cta hidden items-center gap-1.5 rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-85 sm:inline-flex sm:px-4 sm:py-2 sm:text-[11px]"
+              data-text={cta.label}
+            >
+              <span>{cta.label}</span>
+              <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+            </button>
+          ) : (
+            <a
+              href={cta.href}
+              className="register-cta hidden items-center gap-1.5 rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-85 sm:inline-flex sm:px-4 sm:py-2 sm:text-[11px]"
+              data-text={cta.label}
+            >
+              <span>{cta.label}</span>
+              <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+            </a>
+          )}
 
           <button
             type="button"
@@ -120,14 +152,27 @@ export function SiteHeader({ onNavigate }: SiteHeaderProps) {
                 {item.label}
               </button>
             ))}
-            <a
-              href="https://google.com"
-              className="register-cta mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/15 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 disabled:cursor-not-allowed"
-              data-text="Register"
-            >
-              <span>Register</span>
-              <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-            </a>
+            {cta.disabled ? (
+              <button
+                type="button"
+                disabled
+                title="Coming Soon"
+                className="register-cta mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/15 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 disabled:cursor-not-allowed"
+                data-text={cta.label}
+              >
+                <span>{cta.label}</span>
+                <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+              </button>
+            ) : (
+              <a
+                href={cta.href}
+                className="register-cta mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/15 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 disabled:cursor-not-allowed"
+                data-text={cta.label}
+              >
+                <span>{cta.label}</span>
+                <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+              </a>
+            )}
           </div>
         </nav>
       ) : null}
