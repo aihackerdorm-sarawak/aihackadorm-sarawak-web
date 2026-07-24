@@ -13,6 +13,7 @@ import { CountdownScene } from "./CountdownScene";
 import WaveBackground from "./WaveBackground";
 import { formatCountdownParts, getCountdownStage, padTwo } from "@/lib/countdown";
 import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
+import { FaqAccordion } from "./Faq";
 
 type ScheduleItem = {
   id: string;
@@ -802,6 +803,20 @@ function BenefitsSection() {
   );
 }
 
+function FaqSection() {
+  return (
+    <SectionReveal id="faq" className="scroll-mt-28" delay={0.09}>
+      <SectionShell
+        eyebrow="FAQ"
+        title="Got questions?"
+        copy="Here's what people usually ask before signing up."
+      >
+        <FaqAccordion />
+      </SectionShell>
+    </SectionReveal>
+  );
+}
+
 function CollaboratorsSection() {
   return (
     <SectionReveal id="collaborators" className="scroll-mt-28" delay={0.1}>
@@ -978,6 +993,7 @@ function WaveZone() {
         <SponsorsSection />
         <ScheduleSection />
         <BenefitsSection />
+        <FaqSection />
         <CollaboratorsSection />
         <AboutSection />
         <PartnerSocialSection />

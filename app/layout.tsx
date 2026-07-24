@@ -13,19 +13,21 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://aihackadorm-n-build.netlify.app"),
   title,
   description,
+  icons: {
+    icon: [{ url: "/icon.jpeg", type: "image/jpeg" }],
+    apple: [{ url: "/apple-icon.jpeg" }],
+  },
   openGraph: {
     title,
     description,
     url: "/",
     siteName: title,
-    // Reusing the nav logo as a placeholder — it's a small square mark, not a
-    // purpose-built 1200x630 social banner, so previews will look plain until
-    // a real one is designed.
     images: [{ url: "/AI-Hackadorm.png" }],
     locale: "en_US",
     type: "website",
   },
 };
+
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
