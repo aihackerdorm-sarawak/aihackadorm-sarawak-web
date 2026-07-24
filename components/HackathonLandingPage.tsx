@@ -11,7 +11,7 @@ import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { CountdownScene } from "./CountdownScene";
 import WaveBackground from "./WaveBackground";
-import { formatCountdownParts, getCountdownStage, padTwo } from "@/lib/countdown";
+import { formatCountdownParts, getCountdownStage, padTwo, type CountdownStage } from "@/lib/countdown";
 import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
 import { FaqAccordion } from "./Faq";
 
@@ -181,23 +181,64 @@ function SectionShell({
 function PrimaryButton({
   children,
   disabled = false,
+  href,
   onClick,
 }: {
   children: ReactNode;
   disabled?: boolean;
+  href?: string;
   onClick?: () => void;
 }) {
+  const className =
+    "register-cta inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75";
+
+  if (href && !disabled) {
+    return (
+      <a href={href} className={className} data-text={typeof children === "string" ? children : undefined}>
+        {children}
+        <ArrowRight className="h-3.5 w-3.5" />
+      </a>
+    );
+  }
+
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
       title={disabled ? "Coming Soon" : undefined}
-      className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75"
+      className={className}
+      data-text={typeof children === "string" ? children : undefined}
     >
       {children}
       <ArrowRight className="h-3.5 w-3.5" />
     </button>
+  );
+}
+
+function getRegistrationCta(stage: CountdownStage) {
+  if (stage.phase === "registration") {
+    return {
+      label: "Coming Soon",
+      disabled: true,
+      href: undefined,
+    } as const;
+  }
+
+  return {
+    label: "Register",
+    disabled: false,
+    href: "https://google.com",
+  } as const;
+}
+
+function RegistrationCta({ stage }: { stage: CountdownStage }) {
+  const cta = getRegistrationCta(stage);
+
+  return (
+    <PrimaryButton disabled={cta.disabled} href={cta.href}>
+      {cta.label}
+    </PrimaryButton>
   );
 }
 
@@ -384,11 +425,10 @@ function CountdownFallback({
 // requires a referentially stable subscribe).
 const subscribeNoop = () => () => {};
 
-function CountdownSection() {
+function CountdownSection({ stage, values }: { stage: CountdownStage; values: CountdownValues }) {
   const reducedMotion = useReducedMotion() ?? true;
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLDivElement>();
-  const { stage, values } = useCountdownState();
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeightPx, setHeaderHeightPx] = useState(0);
 
@@ -492,7 +532,7 @@ function CountdownSection() {
   );
 }
 
-function HeroSection() {
+function HeroSection({ stage }: { stage: CountdownStage }) {
   const reducedMotion = useReducedMotion() ?? true;
   const navigate = useScrollToId();
   const { graphicsEnabled } = useGraphicsMode();
@@ -557,7 +597,7 @@ function HeroSection() {
           </motion.p>
 
           <div className="flex flex-wrap items-center gap-3">
-            <PrimaryButton disabled>Coming Soon</PrimaryButton>
+            <RegistrationCta stage={stage} />
             <button
               type="button"
               onClick={() => navigate("schedule")}
@@ -933,9 +973,11 @@ function PartnerSocialSection() {
               Interested in partnering with us? We&apos;re finalizing sponsor and collaboration
               details and will share them soon — reach out via our socials in the meantime.
             </p>
+            {/*
             <div className="mt-5 flex flex-wrap gap-3">
-              <PrimaryButton disabled>Coming Soon</PrimaryButton>
+              <RegisterCta />
             </div>
+            */}
           </div>
 
           <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
@@ -1004,6 +1046,7 @@ function WaveZone() {
 
 function LandingContent() {
   const navigate = useScrollToId();
+  const countdown = useCountdownState();
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#030303] text-white">
@@ -1011,9 +1054,9 @@ function LandingContent() {
       <div className="pointer-events-none fixed inset-0 z-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:72px_72px] opacity-30" />
 
       <div className="relative z-10">
-        <SiteHeader onNavigate={navigate} />
-        <HeroSection />
-        <CountdownSection />
+        <SiteHeader onNavigate={navigate} stage={countdown.stage} />
+        <HeroSection stage={countdown.stage} />
+        <CountdownSection stage={countdown.stage} values={countdown.values} />
         <WaveZone />
         <SiteFooter />
       </div>
