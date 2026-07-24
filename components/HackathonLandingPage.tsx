@@ -11,7 +11,7 @@ import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { CountdownScene } from "./CountdownScene";
 import WaveBackground from "./WaveBackground";
-import { formatCountdownParts, getCountdownStage, padTwo } from "@/lib/countdown";
+import { formatCountdownParts, getCountdownStage, padTwo, type CountdownStage } from "@/lib/countdown";
 import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
 
 type ScheduleItem = {
@@ -180,23 +180,63 @@ function SectionShell({
 function PrimaryButton({
   children,
   disabled = false,
+  href,
   onClick,
 }: {
   children: ReactNode;
   disabled?: boolean;
+  href?: string;
   onClick?: () => void;
 }) {
+  const className =
+    "inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75";
+
+  if (href && !disabled) {
+    return (
+      <a href={href} className={className}>
+        {children}
+        <ArrowRight className="h-3.5 w-3.5" />
+      </a>
+    );
+  }
+
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
       title={disabled ? "Coming Soon" : undefined}
-      className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75"
+      className={className}
     >
       {children}
       <ArrowRight className="h-3.5 w-3.5" />
     </button>
+  );
+}
+
+function getRegistrationCta(stage: CountdownStage) {
+  if (stage.phase === "registration") {
+    return {
+      label: "Coming Soon",
+      disabled: true,
+      href: undefined,
+    } as const;
+  }
+
+  return {
+    label: "Register",
+    disabled: false,
+    href: "https://google.com",
+  } as const;
+}
+
+function RegistrationCta({ stage }: { stage: CountdownStage }) {
+  const cta = getRegistrationCta(stage);
+
+  return (
+    <PrimaryButton disabled={cta.disabled} href={cta.href}>
+      {cta.label}
+    </PrimaryButton>
   );
 }
 
@@ -383,11 +423,10 @@ function CountdownFallback({
 // requires a referentially stable subscribe).
 const subscribeNoop = () => () => {};
 
-function CountdownSection() {
+function CountdownSection({ stage, values }: { stage: CountdownStage; values: CountdownValues }) {
   const reducedMotion = useReducedMotion() ?? true;
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLDivElement>();
-  const { stage, values } = useCountdownState();
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeightPx, setHeaderHeightPx] = useState(0);
 
@@ -491,7 +530,7 @@ function CountdownSection() {
   );
 }
 
-function HeroSection() {
+function HeroSection({ stage }: { stage: CountdownStage }) {
   const reducedMotion = useReducedMotion() ?? true;
   const navigate = useScrollToId();
   const { graphicsEnabled } = useGraphicsMode();
@@ -556,7 +595,7 @@ function HeroSection() {
           </motion.p>
 
           <div className="flex flex-wrap items-center gap-3">
-            <PrimaryButton disabled>Coming Soon</PrimaryButton>
+            <RegistrationCta stage={stage} />
             <button
               type="button"
               onClick={() => navigate("schedule")}
@@ -898,7 +937,7 @@ function AboutSection() {
   );
 }
 
-function PartnerSocialSection() {
+function PartnerSocialSection({ stage }: { stage: CountdownStage }) {
   return (
     <SectionReveal id="partner" className="scroll-mt-28" delay={0.14}>
       <SectionShell
@@ -919,7 +958,7 @@ function PartnerSocialSection() {
               details and will share them soon — reach out via our socials in the meantime.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <PrimaryButton disabled>Coming Soon</PrimaryButton>
+              <RegistrationCta stage={stage} />
             </div>
           </div>
 
@@ -956,7 +995,7 @@ function PartnerSocialSection() {
   );
 }
 
-function WaveZone() {
+function WaveZone({ stage }: { stage: CountdownStage }) {
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLDivElement>();
 
@@ -980,7 +1019,7 @@ function WaveZone() {
         <BenefitsSection />
         <CollaboratorsSection />
         <AboutSection />
-        <PartnerSocialSection />
+        <PartnerSocialSection stage={stage} />
       </div>
     </div>
   );
@@ -988,6 +1027,7 @@ function WaveZone() {
 
 function LandingContent() {
   const navigate = useScrollToId();
+  const countdown = useCountdownState();
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#030303] text-white">
@@ -996,9 +1036,9 @@ function LandingContent() {
 
       <div className="relative z-10">
         <SiteHeader onNavigate={navigate} />
-        <HeroSection />
-        <CountdownSection />
-        <WaveZone />
+        <HeroSection stage={countdown.stage} />
+        <CountdownSection stage={countdown.stage} values={countdown.values} />
+        <WaveZone stage={countdown.stage} />
         <SiteFooter />
       </div>
     </main>
