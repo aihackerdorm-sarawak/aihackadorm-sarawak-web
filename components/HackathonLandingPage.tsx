@@ -179,17 +179,19 @@ function SectionShell({
 
 function PrimaryButton({
   children,
+  disabled = false,
   href,
   onClick,
 }: {
   children: ReactNode;
+  disabled?: boolean;
   href?: string;
   onClick?: () => void;
 }) {
   const className =
     "register-cta inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75";
 
-  if (href) {
+  if (href && !disabled) {
     return (
       <a href={href} className={className} data-text={typeof children === "string" ? children : undefined}>
         {children}
@@ -201,9 +203,9 @@ function PrimaryButton({
   return (
     <button
       type="button"
-      disabled
+      disabled={disabled}
       onClick={onClick}
-      title="Coming Soon"
+      title={disabled ? "Coming Soon" : undefined}
       className={className}
       data-text={typeof children === "string" ? children : undefined}
     >
@@ -213,8 +215,30 @@ function PrimaryButton({
   );
 }
 
-function RegisterCta() {
-  return <PrimaryButton href="https://google.com">Register</PrimaryButton>;
+function getRegistrationCta(stage: CountdownStage) {
+  if (stage.phase === "registration") {
+    return {
+      label: "Coming Soon",
+      disabled: true,
+      href: undefined,
+    } as const;
+  }
+
+  return {
+    label: "Register",
+    disabled: false,
+    href: "https://google.com",
+  } as const;
+}
+
+function RegistrationCta({ stage }: { stage: CountdownStage }) {
+  const cta = getRegistrationCta(stage);
+
+  return (
+    <PrimaryButton disabled={cta.disabled} href={cta.href}>
+      {cta.label}
+    </PrimaryButton>
+  );
 }
 
 function CountdownLabels() {
@@ -507,7 +531,7 @@ function CountdownSection({ stage, values }: { stage: CountdownStage; values: Co
   );
 }
 
-function HeroSection() {
+function HeroSection({ stage }: { stage: CountdownStage }) {
   const reducedMotion = useReducedMotion() ?? true;
   const navigate = useScrollToId();
   const { graphicsEnabled } = useGraphicsMode();
@@ -572,7 +596,7 @@ function HeroSection() {
           </motion.p>
 
           <div className="flex flex-wrap items-center gap-3">
-            <RegisterCta />
+            <RegistrationCta stage={stage} />
             <button
               type="button"
               onClick={() => navigate("schedule")}
@@ -1015,7 +1039,7 @@ function LandingContent() {
 
       <div className="relative z-10">
         <SiteHeader onNavigate={navigate} />
-        <HeroSection />
+        <HeroSection stage={countdown.stage} />
         <CountdownSection stage={countdown.stage} values={countdown.values} />
         <WaveZone />
         <SiteFooter />
