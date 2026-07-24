@@ -712,22 +712,22 @@ function ScheduleSection() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 min-[391px]:gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => goToIndex(selectedIndex - 1)}
               disabled={atStart}
               aria-label="Previous milestone"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70 min-[391px]:h-12 min-[391px]:w-12"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4 min-[391px]:h-5 min-[391px]:w-5" />
             </button>
 
-            <div className="min-w-0 flex-1 rounded-[24px] border border-white/10 bg-black/30 p-5">
+            <div className="min-w-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-black/30 p-4 sm:p-5">
               <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
                 Shared detail card
               </p>
-              <h3 className="mt-2 text-2xl font-black uppercase tracking-[-0.05em] text-white">
+              <h3 className="mt-2 max-w-full break-words text-xl font-black uppercase leading-tight tracking-[-0.05em] text-white sm:text-2xl">
                 {selected.title}
               </h3>
               <div className="mt-3 flex items-center gap-3">
@@ -755,9 +755,9 @@ function ScheduleSection() {
               onClick={() => goToIndex(selectedIndex + 1)}
               disabled={atEnd}
               aria-label="Next milestone"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70 min-[391px]:h-12 min-[391px]:w-12"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4 min-[391px]:h-5 min-[391px]:w-5" />
             </button>
           </div>
         </div>
