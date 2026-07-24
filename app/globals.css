@@ -23,6 +23,88 @@
   }
 }
 
+@keyframes register-glitch-shift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    clip-path: inset(0 0 0 0);
+  }
+  20% {
+    transform: translate(-1px, 0);
+    clip-path: inset(0 0 62% 0);
+  }
+  40% {
+    transform: translate(1px, -1px);
+    clip-path: inset(36% 0 18% 0);
+  }
+  60% {
+    transform: translate(-2px, 1px);
+    clip-path: inset(18% 0 42% 0);
+  }
+  80% {
+    transform: translate(1px, 0);
+    clip-path: inset(48% 0 8% 0);
+  }
+}
+
+.register-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.register-cta::before,
+.register-cta::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.register-cta::before {
+  color: #7ffcff;
+  text-shadow: -1px 0 rgba(0, 245, 255, 0.75);
+}
+
+.register-cta::after {
+  color: #4db7ff;
+  text-shadow: 1px 0 rgba(0, 120, 255, 0.65);
+}
+
+.register-cta:hover,
+.register-cta:focus-visible {
+  border-color: rgba(0, 245, 255, 0.55);
+  background-color: rgba(0, 245, 255, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(0, 245, 255, 0.18),
+    0 0 28px rgba(0, 245, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.register-cta:hover::before,
+.register-cta:hover::after,
+.register-cta:focus-visible::before,
+.register-cta:focus-visible::after {
+  opacity: 1;
+  animation: register-glitch-shift 720ms steps(2, end) infinite;
+}
+
+.register-cta > * {
+  position: relative;
+  z-index: 1;
+}
+
 html {
   scroll-behavior: smooth;
   background: #030303;

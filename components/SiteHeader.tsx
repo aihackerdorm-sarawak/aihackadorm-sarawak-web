@@ -85,15 +85,14 @@ export function SiteHeader({ onNavigate }: SiteHeaderProps) {
             <span>{graphicsEnabled ? "On" : "Off"}</span>
           </button>
 
-          <button
-            type="button"
-            disabled
-            title="Coming Soon"
-            className="hidden items-center gap-1.5 rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-85 sm:inline-flex sm:px-4 sm:py-2 sm:text-[11px]"
+          <a
+            href="https://google.com"
+            className="register-cta hidden items-center gap-1.5 rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-85 sm:inline-flex sm:px-4 sm:py-2 sm:text-[11px]"
+            data-text="Register"
           >
-            <span>Coming Soon</span>
+            <span>Register</span>
             <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-          </button>
+          </a>
 
           <button
             type="button"
@@ -121,15 +120,14 @@ export function SiteHeader({ onNavigate }: SiteHeaderProps) {
                 {item.label}
               </button>
             ))}
-            <button
-              type="button"
-              disabled
-              title="Coming Soon"
-              className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/15 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 disabled:cursor-not-allowed"
+            <a
+              href="https://google.com"
+              className="register-cta mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/15 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-black opacity-85 disabled:cursor-not-allowed"
+              data-text="Register"
             >
-              <span>Coming Soon</span>
+              <span>Register</span>
               <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-            </button>
+            </a>
           </div>
         </nav>
       ) : null}
