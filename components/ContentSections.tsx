@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { BadgeCheck, CalendarDays, Globe2, Handshake, Trophy, Users } from "lucide-react";
 import { SectionReveal } from "./SectionReveal";
+import { FaqAccordion } from "./Faq";
 
 type StatCard = {
   label: string;
@@ -92,29 +93,6 @@ const tracks: TrackItem[] = [
   {
     title: "Builder productivity",
     copy: "Developer tools, workflow accelerators, and experiment-heavy prototypes with real utility.",
-  },
-];
-
-const faqs = [
-  {
-    question: "Who should register interest?",
-    answer:
-      "Universities, student organizations, companies, nonprofits, and community groups that want to attend, mentor, sponsor, or partner.",
-  },
-  {
-    question: "Is this only for students?",
-    answer:
-      "No. The page is intentionally written for both students and decision-makers so organizations can move from curiosity to contact quickly.",
-  },
-  {
-    question: "Can the event be hybrid?",
-    answer:
-      "Yes. The information architecture explicitly supports a hybrid format with in-person and remote partner participation.",
-  },
-  {
-    question: "What happens after submission?",
-    answer:
-      "Your request enters the contact endpoint, which can be wired to email, CRM, Slack, or a registration backend in one place.",
   },
 ];
 
@@ -319,25 +297,7 @@ export function ContentSections() {
             title="Make the final objections easy to resolve."
             copy="Short answers remove friction and help partners move from curiosity to action."
           />
-
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {faqs.map((faq) => (
-              <details
-                key={faq.question}
-                className="group rounded-3xl border border-white/10 bg-black/20 p-5"
-              >
-                <summary className="cursor-pointer list-none text-lg font-semibold text-white outline-none">
-                  <span className="flex items-center justify-between gap-3">
-                    <span>{faq.question}</span>
-                    <span className="text-cyan-200 transition-transform">
-                      +
-                    </span>
-                  </span>
-                </summary>
-                <p className="mt-3 text-sm leading-6 text-gray-400">{faq.answer}</p>
-              </details>
-            ))}
-          </div>
+          <FaqAccordion />
         </div>
       </SectionReveal>
     </div>
