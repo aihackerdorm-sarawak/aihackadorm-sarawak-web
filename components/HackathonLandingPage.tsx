@@ -4,7 +4,15 @@ import { Component, useEffect, useRef, useState, useSyncExternalStore } from "re
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Mail, Sparkles, Trophy } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Mail,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
 import { GraphicsModeProvider, useGraphicsMode } from "./GraphicsMode";
 import { SectionReveal } from "./SectionReveal";
 import { SiteFooter } from "./SiteFooter";
@@ -70,6 +78,11 @@ const benefitCards = ["To Be Announced", "To Be Announced", "To Be Announced"];
 
 const partnerLinks = [
   { label: "Instagram", handle: "@aihackerdorm.sarawak", href: "https://www.instagram.com/aihackerdorm.sarawak/" },
+  {
+    label: "LinkedIn",
+    handle: "Borneo Hackathon",
+    href: "https://www.linkedin.com/in/borneo-hackathon-6b80bb421/",
+  },
   { label: "Email", handle: "example@gmail.com", href: "mailto:example@gmail.com" },
 ];
 
@@ -1009,7 +1022,15 @@ function PartnerSocialSection() {
                 >
                   <span className="flex items-center gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/25 text-white/65">
-                      {item.label === "Email" ? <Mail className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                      {item.label === "Email" ? (
+                        <Mail className="h-4 w-4" />
+                      ) : item.label === "LinkedIn" ? (
+                        <span className="text-[13px] font-black leading-none tracking-[-0.08em]">
+                          in
+                        </span>
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
                     </span>
                     <span className="flex flex-col">
                       <span className="text-sm font-medium">{item.label}</span>
