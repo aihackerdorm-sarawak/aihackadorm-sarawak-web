@@ -26,7 +26,7 @@ export function SiteFooter() {
         </div>
 
         <p className="text-[11px] uppercase tracking-[0.28em] text-white/28">
-          © 2026 AI HackerDorm & Swinburne Sarawak
+          © 2026 AI HackerDorm & Swinburne Computer Science Club
         </p>
       </div>
     </footer>

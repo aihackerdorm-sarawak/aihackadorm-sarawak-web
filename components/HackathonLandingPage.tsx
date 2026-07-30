@@ -591,9 +591,9 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
             transition={{ duration: 0.7, delay: 0.08 }}
             className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base"
           >
-            AI Hackadorm Sarawak is a 24-hour hackathon by Swinburne University Sarawak and AI
-            HackerDorm. Students and developers build real AI solutions under one roof in Kuching,
-            Borneo.
+            AI Hackadorm Sarawak is a 24-hour hackathon by AI HackerDorm and the Swinburne
+            Computer Science Club. Students and developers build real AI solutions under one roof
+            in Kuching, Borneo.
           </motion.p>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -862,22 +862,31 @@ function CollaboratorsSection() {
     <SectionReveal id="collaborators" className="scroll-mt-28" delay={0.1}>
       <SectionShell
         eyebrow="Collaborators"
-        title="AI HackerDorm x Swinburne"
-        copy="Two organizers, one shared build room."
+        title="AI HackerDorm x Swinburne Computer Science Club"
+        copy="Two student communities, one shared build room."
       >
         <div className="grid gap-4 md:grid-cols-2">
           {[
             {
               name: "AI HackerDorm",
-              logo: "/AI-Hackadorm.png",
+              logos: [{ src: "/AI-Hackadorm.png", alt: "AI HackerDorm logo" }],
               copy: "Student-led community focused on building AI capability, momentum, and useful collaboration across the region.",
               url: "https://www.aihackerdorm.com/",
             },
             {
-              name: "Swinburne Sarawak",
-              logo: "/Swinburne-Logo.jpg",
-              copy: "University partner bringing academic support, venue context, and a pathway to student participation.",
-              url: "https://www.swinburne.edu.my/",
+              name: "Swinburne Computer Science Club",
+              logos: [
+                {
+                  src: "/computersci-logo.png",
+                  alt: "Swinburne Computer Science Club logo",
+                },
+                {
+                  src: "/Swinburne-Logo.jpg",
+                  alt: "Swinburne University of Technology Sarawak Campus logo",
+                },
+              ],
+              copy: "A student-led computing community at Swinburne Sarawak, connecting students with practical technology, collaboration, and industry opportunities.",
+              url: "https://www.instagram.com/swinburnecompsci/",
             },
           ].map((item) => (
             <a
@@ -888,24 +897,29 @@ function CollaboratorsSection() {
               className="group relative block rounded-[24px] border border-white/10 bg-black/30 p-5 transition-colors hover:border-white/25 hover:bg-black/40"
             >
               <ExternalLink className="absolute right-5 top-5 h-4 w-4 text-white/30 transition-colors group-hover:text-white/70" />
-              <div className="flex items-center gap-4">
-                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5">
-                  <Image
-                    src={item.logo}
-                    alt={item.name}
-                    fill
-                    sizes="64px"
-                    className="object-contain p-2"
-                  />
-                </div>
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                    Organizer
-                  </p>
-                  <h3 className="mt-1 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-                    {item.name}
-                  </h3>
-                </div>
+              <div className="flex items-center -space-x-2">
+                {item.logos.map((logo) => (
+                  <div
+                    key={logo.src}
+                    className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-[#111]"
+                  >
+                    <Image
+                      src={logo.src}
+                      alt={logo.alt}
+                      fill
+                      sizes="64px"
+                      className="object-contain p-2"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+                  Organizer
+                </p>
+                <h3 className="mt-1 pr-8 text-2xl font-black uppercase tracking-[-0.05em] text-white">
+                  {item.name}
+                </h3>
               </div>
               <p className="mt-4 text-sm leading-7 text-white/55">{item.copy}</p>
             </a>
@@ -922,7 +936,7 @@ function AboutSection() {
       <SectionShell
         eyebrow="About Us"
         title="Who we are."
-        copy="Meet the community and university partner behind the event."
+        copy="Meet the two student communities behind the event."
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {[
@@ -932,9 +946,9 @@ function AboutSection() {
                 "A community built around practical AI exploration, student-led experimentation, and sharing what works with the people who are already building.",
             },
             {
-              title: "Swinburne University Sarawak",
+              title: "Swinburne Computer Science Club",
               copy:
-                "An academic partner supporting the hackathon with an environment that can connect students, mentors, and collaborators in one place.",
+                "A vibrant community for students passionate about coding, technology, and innovation. Open to all backgrounds, we offer hands-on workshops, talks, and networking opportunities to enhance skills and knowledge in computer science and ICT.",
             },
           ].map((item) => (
             <div key={item.title} className="rounded-[24px] border border-white/10 bg-black/30 p-5">
