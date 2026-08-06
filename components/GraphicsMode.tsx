@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 type GraphicsModeContextValue = {
@@ -33,11 +33,9 @@ function detectLowPowerDevice() {
   return Boolean(saveData || isFirefox || cores <= 2 || (coarsePointer && cores <= 4));
 }
 
-function getInitialGraphicsState() {
-  if (typeof window === "undefined") {
-    return true;
-  }
-
+// Reads the persisted preference. Returns null when nothing is saved so the
+// caller can fall back to device detection.
+function readSavedGraphicsState() {
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved === "true" || saved === "false") {
@@ -47,11 +45,41 @@ function getInitialGraphicsState() {
     // Ignore storage read failures and fall back to detection.
   }
 
-  return !detectLowPowerDevice();
+  return null;
+}
+
+// Stable no-op subscribe for useSyncExternalStore below (the store is only
+// ever read here; writes go through the toggle's setState, not the store).
+const subscribeNoop = () => () => {};
+
+// The real, client-only initial preference: saved localStorage value, else
+// device detection. Computed once and cached so the snapshot stays
+// referentially stable across renders.
+let cachedClientInitialValue: boolean | null = null;
+function getClientInitialGraphicsState() {
+  if (cachedClientInitialValue === null) {
+    cachedClientInitialValue = readSavedGraphicsState() ?? !detectLowPowerDevice();
+  }
+  return cachedClientInitialValue;
 }
 
 export function GraphicsModeProvider({ children }: { children: ReactNode }) {
-  const [graphicsEnabled, setGraphicsEnabled] = useState(getInitialGraphicsState);
+  // The graphics preference is client-only (localStorage + device detection,
+  // neither exists during SSR), so read it through useSyncExternalStore:
+  // React renders with the server snapshot (graphics ON) during SSR and
+  // hydration, then switches to the real client value once mounted. That is
+  // the one pattern React explicitly allows to differ between server and
+  // client WITHOUT a hydration error. A lazy useState initializer cannot be
+  // used here: on Firefox detection returns OFF, which disagreed with the
+  // server's ON default and made React regenerate the whole tree. The toggle
+  // (a user action, not an effect) drives the override below.
+  const detectedInitial = useSyncExternalStore(
+    subscribeNoop,
+    getClientInitialGraphicsState,
+    () => true
+  );
+  const [override, setOverride] = useState<boolean | null>(null);
+  const graphicsEnabled = override ?? detectedInitial;
 
   useEffect(() => {
     try {
@@ -64,10 +92,10 @@ export function GraphicsModeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<GraphicsModeContextValue>(
     () => ({
       graphicsEnabled,
-      setGraphicsEnabled,
-      toggleGraphics: () => setGraphicsEnabled((current) => !current),
+      setGraphicsEnabled: setOverride,
+      toggleGraphics: () => setOverride((current) => !(current ?? detectedInitial)),
     }),
-    [graphicsEnabled]
+    [detectedInitial, graphicsEnabled]
   );
 
   return <GraphicsModeContext.Provider value={value}>{children}</GraphicsModeContext.Provider>;
@@ -82,4 +110,3 @@ export function useGraphicsMode() {
 
   return context;
 }
-

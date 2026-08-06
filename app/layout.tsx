@@ -32,7 +32,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-[#030303] text-white antialiased">{children}</body>
+      {/* vsc-initialized is injected onto <body> by the VS Code Live Server
+          extension before hydration, which causes a benign hydration
+          mismatch warning. suppressHydrationWarning silences it. */}
+      <body
+        className="bg-[#030303] text-white antialiased"
+        suppressHydrationWarning
+      >
+        {children}
+      </body>
     </html>
   );
 }
