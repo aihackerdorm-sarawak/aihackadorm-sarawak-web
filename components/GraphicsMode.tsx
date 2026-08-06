@@ -23,8 +23,14 @@ function detectLowPowerDevice() {
   const saveData =
     "connection" in navigator &&
     Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData);
+  // Firefox's Canvas2D/WebGL paths are noticeably slower than Chrome/Safari's
+  // on equivalent hardware, so its wave/countdown chug even on strong
+  // machines — default graphics off there regardless of the specs below.
+  const isFirefox = /Firefox/i.test(navigator.userAgent);
 
-  return Boolean(saveData || cores <= 4 || (coarsePointer && cores <= 6));
+  // Deliberately lax: only genuinely weak hardware defaults graphics off.
+  // saveData is an explicit user opt-out, so it always wins.
+  return Boolean(saveData || isFirefox || cores <= 2 || (coarsePointer && cores <= 4));
 }
 
 function getInitialGraphicsState() {

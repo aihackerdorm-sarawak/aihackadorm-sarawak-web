@@ -19,6 +19,11 @@ export const faqs: FaqItem[] = [
     question: "Are we required to pay for this event?",
     answer: "It's completely free!",
   },
+  {
+    question: "Can I join solo, or is the hackathon team-based?",
+    answer:
+      "This is a team-based hackathon, you'll build with a team during the event.",
+  },
 ];
 
 function FaqRow({

@@ -4,7 +4,7 @@ import "./globals.css"
 
 const title = "AI HackerDorm Sarawak";
 const description =
-  "AI HackerDorm Sarawak is a 24-hour AI hackathon by AI HackerDorm and the Swinburne Computer Science Club in Kuching, Borneo. Countdown, schedule, and event details.";
+  "AI HackerDorm Sarawak is a 3-day AI hackathon by AI HackerDorm and the Swinburne Computer Science Club in Kuching, Borneo. Countdown, schedule, and event details.";
 
 export const metadata: Metadata = {
   // Needed for Next to resolve the relative OG image URL below into an
