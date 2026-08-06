@@ -65,12 +65,12 @@ const scheduleItems: ScheduleItem[] = [
   {
     id: "main-event",
     label: "Main Event",
-    date: "Oct 10, 2026",
+    date: "Oct 9, 2026",
     hint: "Build begins",
     title: "Main event begins",
     copy:
-      "The main hackathon start date. The countdown then shifts into the 24-hour live event window until completion.",
-    status: "1-day event",
+      "The main hackathon start date. The countdown then shifts into the 3-day live event window until completion.",
+    status: "3-day event",
   },
 ];
 
@@ -83,7 +83,7 @@ const partnerLinks = [
     handle: "Borneo Hackathon",
     href: "https://www.linkedin.com/in/borneo-hackathon-6b80bb421/",
   },
-  { label: "Email", handle: "example@gmail.com", href: "mailto:example@gmail.com" },
+  { label: "Email", handle: "team@aihackerdorm.com", href: "mailto:team@aihackerdorm.com" },
 ];
 
 function useScrollToId() {
@@ -502,7 +502,7 @@ function CountdownSection({ stage, values }: { stage: CountdownStage; values: Co
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
             {stage.eyebrow}.{" "}
             {stage.phase === "event-live"
-              ? "The main event is live — 24 hours on the clock until it wraps up."
+              ? "The main event is live — 3 days on the clock until it wraps up."
               : "This page updates automatically as each milestone — registration, the workshop, and the main event — arrives."}
           </p>
         </div>
@@ -579,7 +579,7 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
             transition={{ duration: 0.6 }}
             className="font-mono text-[10px] font-semibold uppercase tracking-[0.48em] text-white/65"
           >
-            Oct 10-11, 2026 - Kuching, Sarawak - 24 hours
+            Oct 9-11, 2026 - Kuching, Sarawak - 3 days
           </motion.p>
 
           <motion.h1
@@ -604,7 +604,7 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
             transition={{ duration: 0.7, delay: 0.08 }}
             className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base"
           >
-            AI Hackadorm Sarawak is a 24-hour hackathon by AI HackerDorm and the Swinburne
+            AI Hackadorm Sarawak is a 3-day hackathon by AI HackerDorm and the Swinburne
             Computer Science Club. Students and developers build real AI solutions under one roof
             in Kuching, Borneo.
           </motion.p>
@@ -624,7 +624,7 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:max-w-[30rem]">
           {[
-            { label: "Hackathon", value: "24h" },
+            { label: "Hackathon", value: "3 days" },
             { label: "Format", value: "Build + mentor" },
             { label: "Location", value: "Kuching" },
             { label: "Focus", value: "AI solutions" },
