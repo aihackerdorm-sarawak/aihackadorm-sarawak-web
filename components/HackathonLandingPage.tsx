@@ -604,7 +604,7 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
             transition={{ duration: 0.7, delay: 0.08 }}
             className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base"
           >
-            AI Hackadorm Sarawak is a 3-day hackathon by AI HackerDorm and the Swinburne
+            AI Hackerdorm Sarawak is a 3-day hackathon by AI HackerDorm and the Swinburne
             Computer Science Club. Students and developers build real AI solutions under one roof
             in Kuching, Borneo.
           </motion.p>

@@ -73,7 +73,7 @@ export function SiteHeader({ onNavigate, stage }: SiteHeaderProps) {
               Hackathon
             </span>
             <span className="block truncate text-sm font-semibold tracking-[-0.03em] text-white sm:text-base">
-              aihackadorm.sarawak
+              aihackerdorm.sarawak
             </span>
           </span>
         </button>
