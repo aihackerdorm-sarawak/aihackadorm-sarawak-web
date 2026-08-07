@@ -9,10 +9,10 @@ export function SiteFooter() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-white/40">
-              aihackadorm.sarawak
+              aihackerdorm.sarawak
             </p>
             <p className="mt-2 text-sm text-white/65">
-              AI Hackadorm 2026 · Sarawak · Built for builders.
+              AI Hackerdorm 2026 · Sarawak · Built for builders.
             </p>
           </div>
 
