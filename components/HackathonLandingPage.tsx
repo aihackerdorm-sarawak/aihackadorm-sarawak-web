@@ -22,6 +22,7 @@ import WaveBackground from "./WaveBackground";
 import { formatCountdownParts, getCountdownStage, padTwo, type CountdownStage } from "@/lib/countdown";
 import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
 import { FaqAccordion } from "./Faq";
+import RegistrationForm from './RegistrationForm';
 
 type ScheduleItem = {
   id: string;
@@ -45,7 +46,7 @@ const scheduleItems: ScheduleItem[] = [
   {
     id: "registration",
     label: "Registration Opens",
-    date: "Sep 1, 2026",
+    date: "Aug 1, 2026",
     hint: "Launch milestone",
     title: "Registration opens",
     copy:
@@ -241,11 +242,12 @@ function getRegistrationCta(stage: CountdownStage) {
   return {
     label: "Register",
     disabled: false,
-    href: "https://google.com",
+    href: "/register",
   } as const;
 }
 
 function RegistrationCta({ stage }: { stage: CountdownStage }) {
+  // We brought this line back so the timer controls the button again!
   const cta = getRegistrationCta(stage);
 
   return (
@@ -254,6 +256,7 @@ function RegistrationCta({ stage }: { stage: CountdownStage }) {
     </PrimaryButton>
   );
 }
+
 
 function CountdownLabels() {
   return (

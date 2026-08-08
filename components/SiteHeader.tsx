@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ArrowRight, Menu, Sparkles, X } from "lucide-react";
 import { useGraphicsMode } from "./GraphicsMode";
 import type { CountdownStage } from "@/lib/countdown";
+import Link from "next/link";
 
 type SiteHeaderProps = {
   onNavigate: (id: string) => void;
@@ -45,7 +46,7 @@ function getHeaderCta(stage: CountdownStage) {
   return {
     label: "Register",
     disabled: false,
-    href: "https://google.com",
+    href: "/register",
   } as const;
 }
 
