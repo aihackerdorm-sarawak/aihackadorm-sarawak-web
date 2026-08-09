@@ -140,10 +140,17 @@ function flattenHackathon(
   const personColumns = HACKATHON_MEMBER_FIELDS.map((f) => f.key);
   const metaColumns = HACKATHON_META_FIELDS.map((f) => f.key);
 
-  const rows = [[timestamp(), "Leader", ...metaColumns.map((k) => meta[k]), ...personColumns.map((k) => leader[k])]];
+  // Leader has no studentId key — pad with "" so every row has the same width
+  // (undefined would serialize to null in the JSON response).
+  const personValues = (person: Record<string, string>) =>
+    personColumns.map((key) => person[key] ?? "");
+
+  const rows = [
+    [timestamp(), "Leader", ...metaColumns.map((k) => meta[k]), ...personValues(leader)],
+  ];
 
   for (const member of members) {
-    rows.push([timestamp(), "Member", ...metaColumns.map((k) => meta[k]), ...personColumns.map((k) => member[k])]);
+    rows.push([timestamp(), "Member", ...metaColumns.map((k) => meta[k]), ...personValues(member)]);
   }
 
   return rows;
