@@ -101,7 +101,7 @@ const memberFields = [
 export default function RegistrationForm() {
   const [formType, setFormType] = useState<'hackathon' | 'workshop'>('hackathon');
 
-  const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema) as any });
+  const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema) as any, mode: 'onChange' });
   const workshopForm = useForm<WorkshopData>({ resolver: zodResolver(workshopSchema) as any, mode: 'onChange' });
   
   const currentTeamSize = hackathonForm.watch('teamSize');

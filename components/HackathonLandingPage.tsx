@@ -46,7 +46,7 @@ const scheduleItems: ScheduleItem[] = [
   {
     id: "registration",
     label: "Registration Opens",
-    date: "Aug 1, 2026",
+    date: "Sep 1, 2026",
     hint: "Launch milestone",
     title: "Registration opens",
     copy:
