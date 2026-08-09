@@ -27,7 +27,7 @@ type WorkshopData = z.infer<typeof workshopSchema>;
 const hackathonSchema = z.object({
   teamName: z.string().min(2, 'Team name is required'),
   teamUniversity: z.string().min(2, 'University is required'),
-  teamSize: z.coerce.number().min(1).max(5),
+  teamSize: z.preprocess((val) => Number(val), z.number().min(1).max(5)),
   hearAboutUs: z.string().min(2, 'Please tell us how you found us'),
   leaderName: z.string().min(2, 'Leader name is required'),
   leaderEmail: z.string().email('Please enter a valid email address'),
@@ -95,16 +95,14 @@ const memberFields = [
   { id: 'year', label: 'Year of Study', type: 'select', options: yearOptions },
 ];
 
-
-
 // ==========================================
 // 3. MAIN COMPONENT
 // ==========================================
 export default function RegistrationForm() {
   const [formType, setFormType] = useState<'hackathon' | 'workshop'>('hackathon');
 
-  const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema), defaultValues: { teamSize: 1 }, mode: 'onChange' });
-  const workshopForm = useForm<WorkshopData>({ resolver: zodResolver(workshopSchema), mode: 'onChange' });
+  const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema) as any });
+  const workshopForm = useForm<WorkshopData>({ resolver: zodResolver(workshopSchema) as any, mode: 'onChange' });
   
   const currentTeamSize = hackathonForm.watch('teamSize');
 
@@ -119,52 +117,49 @@ export default function RegistrationForm() {
     alert('Workshop Registration Submitted!');
   };
 
-  // Helper component to render a single input beautifully
-// Helper component to render inputs OR dropdowns beautifully
-// Helper component to render inputs OR dropdowns beautifully
-// Helper component to render inputs OR dropdowns beautifully
-const renderInput = (field: any, form: any, prefix = '') => {
-  const fieldName = prefix ? `${prefix}.${field.id}` : field.id;
-  const error = prefix 
-    ? form.formState.errors.members?.[parseInt(prefix.split('.')[1])]?.[field.id]
-    : form.formState.errors[field.id];
+  // Helper component to render inputs OR dropdowns beautifully
+  const renderInput = (field: any, form: any, prefix = '') => {
+    const fieldName = prefix ? `${prefix}.${field.id}` : field.id;
+    const error = prefix 
+      ? form.formState.errors.members?.[parseInt(prefix.split('.')[1])]?.[field.id]
+      : form.formState.errors[field.id];
 
-  // THE MAGIC: These classes create the hover and focus animations!
-  const inputClasses = `
-    p-3 rounded-lg bg-zinc-900 border border-zinc-800 
-    hover:border-cyan-500/60 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]
-    focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30 focus:shadow-[0_0_15px_rgba(6,182,212,0.4)]
-    focus:outline-none transition-all duration-300
-  `;
+    // THE MAGIC: These classes create the hover and focus animations!
+    const inputClasses = `
+      p-3 rounded-lg bg-zinc-900 border border-zinc-800 
+      hover:border-cyan-500/60 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]
+      focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30 focus:shadow-[0_0_15px_rgba(6,182,212,0.4)]
+      focus:outline-none transition-all duration-300
+    `;
 
-  return (
-    <div key={fieldName} className="flex flex-col">
-      <label className="mb-1.5 text-sm text-zinc-300">{field.label}</label>
-      
-      {field.type === 'select' ? (
-        <select 
-          {...form.register(fieldName)}
-          defaultValue=""
-          className={`${inputClasses} appearance-none`}
-        >
-          <option value="" disabled>Select year...</option>
-          {field.options.map((opt: string) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      ) : (
-        <input 
-          type={field.type}
-          placeholder={field.placeholder}
-          {...form.register(fieldName)} 
-          className={inputClasses} 
-        />
-      )}
-      
-      {error && <span className="text-red-400 text-xs mt-1">{error.message as string}</span>}
-    </div>
-  );
-};
+    return (
+      <div key={fieldName} className="flex flex-col">
+        <label className="mb-1.5 text-sm text-zinc-300">{field.label}</label>
+        
+        {field.type === 'select' ? (
+          <select 
+            {...form.register(fieldName)}
+            defaultValue=""
+            className={`${inputClasses} appearance-none`}
+          >
+            <option value="" disabled>Select year...</option>
+            {field.options.map((opt: string) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        ) : (
+          <input 
+            type={field.type}
+            placeholder={field.placeholder}
+            {...form.register(fieldName)} 
+            className={inputClasses} 
+          />
+        )}
+        
+        {error && <span className="text-red-400 text-xs mt-1">{error.message as string}</span>}
+      </div>
+    );
+  };
 
   return (
     <div className="p-8 bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-2xl max-w-3xl w-full mx-auto text-white shadow-xl">
@@ -178,10 +173,10 @@ const renderInput = (field: any, form: any, prefix = '') => {
       
       {/* TAB SWITCHER */}
       <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-black p-2 rounded-xl border border-zinc-800">
-        <button onClick={() => setFormType('hackathon')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'hackathon' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+        <button type="button" onClick={() => setFormType('hackathon')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'hackathon' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
           Hackathon Participation
         </button>
-        <button onClick={() => setFormType('workshop')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'workshop' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+        <button type="button" onClick={() => setFormType('workshop')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'workshop' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
           Workshop Participation
         </button>
       </div>
