@@ -136,6 +136,52 @@ Rules & gotchas (hard-won — don't relearn these):
 - `ScheduleSection` — timeline dots sit in a row **below** the text; prev/next
   arrow buttons + a position counter drive it (mobile-friendly stepper).
 
+## Registration backend — Google Sheets API (`Google-Sheets-API` branch)
+
+The registration backend: hackathon + workshop submissions are validated,
+sanitized, and appended to a Google Sheet. Full detail in `GOOGLE_SHEETS_API.md`
+(payloads, columns, env vars, test record). The frontend form does NOT exist
+yet — this was built and live-tested first.
+
+- **Config-driven by design** — `lib/registration-config.ts` is the single
+  source of truth: every payload field (key, sheet column label, type, max
+  length) is one entry in an array. The route validates, sanitizes and
+  flattens purely from these definitions. Adding a field = one line there,
+  NEVER route logic. Keep it that way (the user asked for scalability).
+- **`app/api/register/route.ts`** — `POST /api/register` with
+  `{ formType: "workshop" | "hackathon", data }`. `GET /api/register` is a
+  smoke test (spreadsheet title/tabs/config) — safe to keep while there's no
+  form UI. Validation conventions mirror the old Supabase edge functions
+  (`error_code`/`field`).
+- **Hard-won gotchas (don't regress):**
+  - `spreadsheets.values.append` MUST use `valueInputOption: "RAW"`. With
+    `USER_ENTERED`, phone numbers like `+60 12-345-6789` start with `+` and
+    get parsed as formulas → every contact column became `#ERROR!`.
+  - `teamSize` arrives as a JSON **number**; the generic sanitizer only
+    handles strings (stripHtml returns `""` for numbers), so teamSize is
+    declared `required: false` in `HACKATHON_META_FIELDS` and validated as an
+    integer separately in the route, then re-injected into the row values.
+  - `.env` private keys arrive with literal `\n` — code converts
+    `GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n")` before auth.
+  - `ensureTabWithHeaders` writes headers only when the first row is missing
+    or entirely empty — never overwrites an existing non-empty row.
+  - Hackathon stores **one row per person** (leader + members), team meta
+    repeated, `Person Type` column — deliberate choice for filtering/pivoting
+    in Sheets; not one row per team.
+- **Sheet layout:** tabs `Hackathon` (13 cols) + `Workshop` (7 cols), both
+  auto-created with headers on first write. Timestamps are `Asia/Kuching`,
+  24h, via `Intl.DateTimeFormat` `formatToParts` (en-CA locale strings like
+  `4:05:42 p.m.` were rejected as ugly).
+- **Service account auth** — `lib/sheets.ts` uses `@googleapis/sheets`
+  (official SDK, `sheets({ version: "v4", auth })` — there is NO `google`
+  export; don't import `google` from it). Lazy singleton client. Sheet must
+  be shared (Editor) with the service account email.
+- **Env vars** (`.env.local`, git-ignored): `GOOGLE_SHEET_ID`,
+  `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` (keep quotes),
+  optional `GOOGLE_HACKATHON_TAB`/`GOOGLE_WORKSHOP_TAB`. `.env.example` is
+  the template but is ALSO matched by the `.env*` gitignore rule — force-add
+  it when committing.
+
 ## Known open items (from a full-site scan — NOT yet done)
 - Content inconsistencies: "Oct 10-11" vs Oct 10→12; brand name "HackerDorm"
   vs "Hackadorm"; placeholder `mailto:example@gmail.com`. (The 24-hour vs
@@ -157,15 +203,15 @@ Rules & gotchas (hard-won — don't relearn these):
   worth recompressing to ~15KB.
 - No web font is actually loaded (globals.css references `--font-geist-*` but
   `next/font` is never imported); metadata is thin (no OpenGraph/viewport).
-- Netlify deploys `main`; the timer/header/wave work lives on
-  `wavedot-noah-testbranch` — it must be merged to `main` to go live.
+- Vercel deploys `main`. The Google Sheets registration backend lives on
+  `Google-Sheets-API` — it must be merged to `main` to go live.
 
 ## Session status (for the next session to confirm)
 
 Recent pass focused on the countdown hover feel + perf. All changes are on
 `wavedot-noah-testbranch`, NOT committed/merged yet, and verified only in the
 local dev server + a one-off prod build (`npm run build` / `PORT=xxxx npm run
-start`), not on Netlify. To confirm: run `npm run dev`, scroll to the countdown,
+start`), not on Vercel. To confirm: run `npm run dev`, scroll to the countdown,
 hover a digit (dots should swell + repel + show a faint red/cyan fringe, no
 white glow), then check `npx tsc --noEmit` and `npx eslint` are clean (one known
 `CountdownLabels` no-unused-vars warning is expected).
@@ -194,3 +240,15 @@ The dev-server `lightningcss` win32 native-binary error at session start was an
 environment issue (arm64 binary present, machine is x64), fixed by deleting
 `node_modules` + `package-lock.json` and reinstalling. If `npm run dev` fails on
 `Cannot find module '../lightningcss.win32-x64-msvc.node'`, do a clean reinstall.
+
+---
+
+**Next session (Google-Sheets-API branch):** built + live-tested the Google
+Sheets registration backend (see the section above and `GOOGLE_SHEETS_API.md`).
+Verified against the real spreadsheet: auth, auto tab/header creation, workshop
+append, 3-person hackathon append (3 rows), error paths (bad email, team-size
+mismatch). Two bugs fixed in-session: `USER_ENTERED` → `RAW` (phone `#ERROR!`),
+and number-typed `teamSize` rejected by the string sanitizer. Test rows were
+cleared from the sheet; `tsc` + `eslint` clean. Dev server was left running on
+port 3000 (`.env.local` loaded). Not done: registration form UI, captcha,
+rate limiting, commit of the branch.
