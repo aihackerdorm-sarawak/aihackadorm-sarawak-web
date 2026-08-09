@@ -181,6 +181,16 @@ yet — this was built and live-tested first.
   optional `GOOGLE_HACKATHON_TAB`/`GOOGLE_WORKSHOP_TAB`. `.env.example` is
   the template but is ALSO matched by the `.env*` gitignore rule — force-add
   it when committing.
+- **Tests** — `npm test` (jest + ts-jest, config in `jest.config.js`, suites
+  in `tests/`). Run against the real sheet is NOT required: `@googleapis/sheets`
+  and `@/lib/sheets` are mocked. `tests/register-route.test.ts` covers
+  validation/sanitization/flattening + error codes end-to-end at the route
+  level (appendRows mock captures the exact row arrays — assert on those for
+  column layout); `tests/sheets.test.ts` covers auth wiring, tab/header
+  creation and the RAW-append behavior; `tests/registration-config.test.ts`
+  guards the config-driven field lists. Keep the `#ERROR!` regression test
+  (RAW input) and the teamSize-as-number test — both are real bugs that were
+  caught live and fixed.
 
 ## Known open items (from a full-site scan — NOT yet done)
 - Content inconsistencies: "Oct 10-11" vs Oct 10→12; brand name "HackerDorm"

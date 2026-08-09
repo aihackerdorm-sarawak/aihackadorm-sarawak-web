@@ -145,6 +145,21 @@ configured forms — useful as a connection smoke test while there's no form UI.
 - `tsc --noEmit` and `eslint` clean (only the pre-existing `CountdownLabels`
   warning); test rows were cleared from the spreadsheet afterwards
 
+## Automated tests (`npm test`)
+
+Jest + ts-jest (`jest.config.js`, suites in `tests/`). No real Google
+credentials or network needed — `@googleapis/sheets` and `lib/sheets.ts` are
+mocked.
+
+| Suite | Covers |
+| --- | --- |
+| `tests/register-route.test.ts` | Route-level validation/sanitization/flattening: valid workshop + hackathon POSTs, bad email/phone/missing fields, team-size mismatch and range, member `studentId`, HTML stripping, length caps, invalid JSON/formType, 500 on sheet failure, GET smoke test — 21 tests |
+| `tests/sheets.test.ts` | Auth wiring (private-key `\n` conversion, scopes, client reuse), tab creation + header writing (only when first row empty), RAW append (the `#ERROR!` regression), empty-rows guard — 10 tests |
+| `tests/registration-config.test.ts` | The config-driven field lists and header rows stay in sync with the form spec — 8 tests |
+
+Tests caught the leader `studentId` `undefined` → `null` serialization bug
+(fixed with an explicit `""` in `flattenHackathon`).
+
 ## Not done yet / next steps
 
 - **Registration form UI** (hackathon + workshop tabs) wired to this endpoint
