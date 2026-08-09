@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import * as z from 'zod';
@@ -228,6 +229,10 @@ export default function RegistrationForm() {
             </div>
           )}
 
+          <div className="flex justify-center my-4 min-h-[65px]">
+            <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
+          </div>
+
           <button type="submit" className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg">
             SUBMIT HACKATHON REGISTRATION →
           </button>
@@ -240,6 +245,9 @@ export default function RegistrationForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Render workshop fields via mapping */}
             {workshopFields.map(field => renderInput(field, workshopForm))}
+          </div>
+          <div className="flex justify-center my-4 min-h-[65px]">
+            <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
           </div>
           <button type="submit" className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg">
             SUBMIT WORKSHOP REGISTRATION →
