@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { appendRows, ensureTabWithHeaders, getSheetsClient, getSheetsEnv, getTabName } from "@/lib/sheets";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   FORMS,
   HACKATHON_LEADER_FIELDS,
@@ -156,6 +157,14 @@ function flattenHackathon(
   return rows;
 }
 
+function getClientIp(request: Request): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  return request.headers.get("x-real-ip") ?? "unknown";
+}
+
 async function handleWorkshop(data: unknown): Promise<NextResponse> {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return errorResponse({ success: false, error_code: "VALIDATION_ERROR", message: "Invalid payload shape" });
@@ -275,6 +284,21 @@ export async function POST(request: Request) {
       message: "formType must be \"workshop\" or \"hackathon\"",
       field: "formType",
     });
+  }
+
+  const ipAddress = getClientIp(request);
+  const rateLimitKey = `${ipAddress}:${formType}`;
+
+  const allowed = await checkRateLimit(rateLimitKey);
+  if (!allowed) {
+    return errorResponse(
+      {
+        success: false,
+        error_code: "RATE_LIMITED",
+        message: "Too many attempts. Please try again in a few minutes.",
+      },
+      429
+    );
   }
 
   try {
