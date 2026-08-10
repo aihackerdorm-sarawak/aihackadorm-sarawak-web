@@ -200,21 +200,21 @@ export default function RegistrationForm() {
 
     // THE MAGIC: These classes create the hover and focus animations!
     const inputClasses = `
-      p-3 rounded-lg bg-zinc-900 border border-zinc-800 
-      hover:border-cyan-500/60 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]
+      p-3 rounded-xl bg-white/[0.04] backdrop-blur-sm border border-white/10 text-white placeholder:text-white/30
+      hover:border-cyan-400/40 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]
       focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30 focus:shadow-[0_0_15px_rgba(6,182,212,0.4)]
       focus:outline-none transition-all duration-300
     `;
 
     return (
       <div key={fieldName} className="flex flex-col">
-        <label className="mb-1.5 text-sm text-zinc-300">{field.label}</label>
+        <label className="mb-1.5 text-sm text-white/70">{field.label}</label>
         
         {field.type === 'select' ? (
           <select 
             {...form.register(fieldName)}
             defaultValue=""
-            className={`${inputClasses} appearance-none`}
+            className={`${inputClasses} appearance-none [&>option]:bg-[#030303]`}
           >
             <option value="" disabled>Select year...</option>
             {field.options.map((opt: string) => (
@@ -236,21 +236,21 @@ export default function RegistrationForm() {
   };
 
   return (
-    <div className="p-8 bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-2xl max-w-3xl w-full mx-auto text-white shadow-xl">
+    <div className="p-6 sm:p-8 bg-white/[0.045] backdrop-blur-md border border-white/10 rounded-[30px] max-w-3xl w-full mx-auto text-white shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
       <Link 
         href="/" 
-        className="inline-block mb-6 text-sm font-semibold text-zinc-400 hover:text-cyan-400 transition-colors"
+        className="inline-block mb-6 text-sm font-semibold text-white/50 hover:text-cyan-400 transition-colors"
       >
         ← Back to Home
       </Link>
-      <h2 className="text-3xl font-bold mb-6 tracking-tight text-center">Registration</h2>
+      <h2 className="text-3xl sm:text-4xl font-black uppercase tracking-[-0.06em] mb-8 text-center text-white">Registration</h2>
       
       {/* TAB SWITCHER */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-black p-2 rounded-xl border border-zinc-800">
-        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('hackathon'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'hackathon' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-white/[0.03] p-2 rounded-2xl border border-white/10">
+        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('hackathon'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-xl font-bold uppercase tracking-[0.18em] text-[11px] transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'hackathon' ? 'bg-white text-black shadow-[0_0_20px_rgba(0,245,255,0.25)]' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
           Hackathon Participation
         </button>
-        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('workshop'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'workshop' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('workshop'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-xl font-bold uppercase tracking-[0.18em] text-[11px] transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'workshop' ? 'bg-white text-black shadow-[0_0_20px_rgba(0,245,255,0.25)]' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
           Workshop Participation
         </button>
       </div>
@@ -264,7 +264,7 @@ export default function RegistrationForm() {
         <form onSubmit={hackathonForm.handleSubmit(onHackathonSubmit)} className="space-y-8 animate-in fade-in duration-300">
           
           <div className="space-y-4">
-            <h3 className="text-xl font-bold border-b border-zinc-800 pb-2 text-cyan-400">Team Information</h3>
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60 border-b border-white/10 pb-2">Team Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Render regular team fields via mapping */}
               {hackathonTeamFields.map(field => renderInput(field, hackathonForm))}
@@ -272,7 +272,7 @@ export default function RegistrationForm() {
               {/* Dropdown needs manual handling because it's a select, not an input */}
               <div className="flex flex-col">
                 <label className="mb-1.5 text-sm text-zinc-300">Team Size</label>
-                <select {...hackathonForm.register('teamSize')} className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 focus:border-cyan-400 focus:outline-none appearance-none">
+                <select {...hackathonForm.register('teamSize')} className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:border-cyan-400 focus:outline-none appearance-none [&>option]:bg-[#030303]">
                   {[1, 2, 3, 4, 5].map(num => <option key={num} value={num}>{num} Person{num > 1 ? 's' : ' (Solo)'}</option>)}
                 </select>
               </div>
@@ -280,7 +280,7 @@ export default function RegistrationForm() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-xl font-bold border-b border-zinc-800 pb-2 text-cyan-400">Team Leader</h3>
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60 border-b border-white/10 pb-2">Team Leader</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Render leader fields via mapping */}
               {hackathonLeaderFields.map(field => renderInput(field, hackathonForm))}
@@ -289,10 +289,10 @@ export default function RegistrationForm() {
 
           {currentTeamSize > 1 && (
             <div className="space-y-6 pt-4">
-              <h3 className="text-xl font-bold border-b border-zinc-800 pb-2 text-cyan-400">Team Members</h3>
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60 border-b border-white/10 pb-2">Team Members</h3>
               {Array.from({ length: currentTeamSize - 1 }).map((_, index) => (
-                <div key={index} className="p-5 border border-zinc-700/50 rounded-xl bg-black/40 space-y-4">
-                  <h4 className="text-white font-bold bg-zinc-800/50 inline-block px-3 py-1 rounded-md">Member {index + 1}</h4>
+                <div key={index} className="p-5 border border-white/10 rounded-2xl bg-white/[0.03] space-y-4">
+                  <h4 className="text-white font-bold bg-white/10 inline-block px-3 py-1 rounded-md">Member {index + 1}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Render dynamic member fields via mapping */}
                     {memberFields.map(field => renderInput(field, hackathonForm, `members.${index}`))}
