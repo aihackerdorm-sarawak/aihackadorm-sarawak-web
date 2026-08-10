@@ -52,6 +52,15 @@ const hackathonSchema = z.object({
 });
 type HackathonData = z.infer<typeof hackathonSchema>;
 
+type SubmissionStatus =
+  | { type: 'idle'; message: '' }
+  | { type: 'success' | 'error'; message: string };
+
+type RegistrationResponse = {
+  success: boolean;
+  message?: string;
+};
+
 // ==========================================
 // 2. FORM CONFIGURATIONS (The Data)
 // If you need a new field, just add it to these arrays!
@@ -101,21 +110,85 @@ const memberFields = [
 // ==========================================
 export default function RegistrationForm() {
   const [formType, setFormType] = useState<'hackathon' | 'workshop'>('hackathon');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({ type: 'idle', message: '' });
+  const submissionInProgress = React.useRef(false);
 
   const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema) as any, mode: 'onChange' });
   const workshopForm = useForm<WorkshopData>({ resolver: zodResolver(workshopSchema) as any, mode: 'onChange' });
   
   const currentTeamSize = hackathonForm.watch('teamSize');
 
-  const onHackathonSubmit = (data: HackathonData) => {
-    const finalData = { ...data, members: data.members?.slice(0, data.teamSize - 1) || [] };
-    console.log('Hackathon Data:', finalData);
-    alert('Hackathon Registration Submitted!');
+  const submitRegistration = async (payload: object) => {
+    if (submissionInProgress.current) return;
+
+    submissionInProgress.current = true;
+    setIsSubmitting(true);
+    setSubmissionStatus({ type: 'idle', message: '' });
+
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json().catch(() => null) as RegistrationResponse | null;
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || 'Unable to submit your registration. Please try again.');
+      }
+
+      setSubmissionStatus({
+        type: 'success',
+        message: result.message || 'Registration submitted successfully.',
+      });
+    } catch (error) {
+      setSubmissionStatus({
+        type: 'error',
+        message: error instanceof Error
+          ? error.message
+          : 'Unable to submit your registration. Please try again.',
+      });
+    } finally {
+      submissionInProgress.current = false;
+      setIsSubmitting(false);
+    }
   };
 
-  const onWorkshopSubmit = (data: WorkshopData) => {
-    console.log('Workshop Data:', data);
-    alert('Workshop Registration Submitted!');
+  const onHackathonSubmit = async (data: HackathonData) => {
+    const teamMembers = (data.members ?? []).slice(0, data.teamSize - 1).map((member) => ({
+      fullName: member.fullName,
+      email: member.email,
+      contact: member.contact,
+      studentId: member.studentId,
+      university: member.university,
+      program: member.program,
+      yearOfStudy: member.year,
+    }));
+
+    await submitRegistration({
+      formType: 'hackathon',
+      data: {
+        teamName: data.teamName,
+        teamUniversity: data.teamUniversity,
+        teamSize: data.teamSize,
+        howDidYouHear: data.hearAboutUs,
+        teamLeader: {
+          fullName: data.leaderName,
+          email: data.leaderEmail,
+          contact: data.leaderWhatsapp,
+          university: data.leaderUniversity,
+          program: data.leaderProgram,
+          yearOfStudy: data.leaderYear,
+        },
+        teamMembers,
+      },
+    });
+  };
+
+  const onWorkshopSubmit = async (data: WorkshopData) => {
+    await submitRegistration({ formType: 'workshop', data });
   };
 
   // Helper component to render inputs OR dropdowns beautifully
@@ -174,10 +247,10 @@ export default function RegistrationForm() {
       
       {/* TAB SWITCHER */}
       <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-black p-2 rounded-xl border border-zinc-800">
-        <button type="button" onClick={() => setFormType('hackathon')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'hackathon' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('hackathon'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'hackathon' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
           Hackathon Participation
         </button>
-        <button type="button" onClick={() => setFormType('workshop')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'workshop' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('workshop'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'workshop' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
           Workshop Participation
         </button>
       </div>
@@ -233,7 +306,7 @@ export default function RegistrationForm() {
             <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
           </div>
 
-          <button type="submit" className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg">
+          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg disabled:cursor-not-allowed disabled:opacity-60">
             SUBMIT HACKATHON REGISTRATION →
           </button>
         </form>
@@ -249,10 +322,26 @@ export default function RegistrationForm() {
           <div className="flex justify-center my-4 min-h-[65px]">
             <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
           </div>
-          <button type="submit" className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg">
+          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg disabled:cursor-not-allowed disabled:opacity-60">
             SUBMIT WORKSHOP REGISTRATION →
           </button>
         </form>
+      )}
+
+      {isSubmitting && (
+        <p role="status" aria-live="polite" className="mt-6 text-center text-sm text-cyan-400">
+          Submitting your registration...
+        </p>
+      )}
+
+      {!isSubmitting && submissionStatus.type !== 'idle' && (
+        <p
+          role={submissionStatus.type === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+          className={`mt-6 text-center text-sm ${submissionStatus.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}
+        >
+          {submissionStatus.message}
+        </p>
       )}
 
     </div>
