@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function RegisterPage() {
   return (
-    <main className="relative min-h-screen bg-black flex flex-col items-center justify-center p-6 pt-24 pb-12">
+    <main className="relative min-h-screen bg-[#030303] flex flex-col items-center justify-center p-6 pt-24 pb-12">
       
       {/* The Background Layer (z-0 keeps it in the back) */}
       <div className="absolute inset-0 z-0 opacity-60 pointer-events-none">
