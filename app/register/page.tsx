@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { COUNTDOWN_TARGETS } from '@/lib/countdown';
 import RegistrationForm from '@/components/RegistrationForm';
 import WaveBackground from '@/components/WaveBackground'; // Pulling in your team's wave dots!
 
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 export default function RegisterPage() {
   // 1. Define the launch date and current time
   // Note: Added +08:00 so it opens exactly at midnight Malaysia time!
-  const launchDate = new Date('2026-09-01T00:00:00+08:00'); 
+  const launchDate = COUNTDOWN_TARGETS.registration; 
   const now = new Date();
 
   // 2. The Server-Side Bounce
