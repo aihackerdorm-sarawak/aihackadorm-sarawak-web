@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertCircle, CheckCircle2, LoaderCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import * as z from 'zod';
 
@@ -113,6 +115,16 @@ export default function RegistrationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({ type: 'idle', message: '' });
   const submissionInProgress = React.useRef(false);
+
+  React.useEffect(() => {
+    if (submissionStatus.type === 'idle') return;
+
+    const timeout = window.setTimeout(() => {
+      setSubmissionStatus({ type: 'idle', message: '' });
+    }, 6000);
+
+    return () => window.clearTimeout(timeout);
+  }, [submissionStatus]);
 
   const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema) as any, mode: 'onChange' });
   const workshopForm = useForm<WorkshopData>({ resolver: zodResolver(workshopSchema) as any, mode: 'onChange' });
@@ -237,6 +249,68 @@ export default function RegistrationForm() {
 
   return (
     <div className="p-8 bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-2xl max-w-3xl w-full mx-auto text-white shadow-xl">
+      {(isSubmitting || submissionStatus.type !== 'idle') && createPortal(
+        <div
+          role={submissionStatus.type === 'error' ? 'alert' : 'status'}
+          aria-live={submissionStatus.type === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
+          className="fixed inset-x-4 top-5 z-[100] flex justify-center pointer-events-none sm:top-7"
+        >
+          <div
+            className={`pointer-events-auto flex w-full max-w-md items-center gap-3 overflow-hidden rounded-xl border bg-zinc-950/95 px-4 py-3.5 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-3 duration-300 ${
+              isSubmitting
+                ? 'border-cyan-400/50 shadow-cyan-500/20'
+                : submissionStatus.type === 'success'
+                  ? 'border-emerald-400/50 shadow-emerald-500/20'
+                  : 'border-red-400/50 shadow-red-500/20'
+            }`}
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                isSubmitting
+                  ? 'bg-cyan-400/10 text-cyan-300'
+                  : submissionStatus.type === 'success'
+                    ? 'bg-emerald-400/10 text-emerald-300'
+                    : 'bg-red-400/10 text-red-300'
+              }`}
+              aria-hidden="true"
+            >
+              {isSubmitting ? (
+                <LoaderCircle className="h-5 w-5 animate-spin" />
+              ) : submissionStatus.type === 'success' ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <AlertCircle className="h-5 w-5" />
+              )}
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold tracking-wide text-white">
+                {isSubmitting
+                  ? 'Submitting registration'
+                  : submissionStatus.type === 'success'
+                    ? 'Registration received'
+                    : 'Submission unsuccessful'}
+              </p>
+              <p className="mt-0.5 text-sm leading-5 text-zinc-300">
+                {isSubmitting ? 'Please wait while we secure your spot...' : submissionStatus.message}
+              </p>
+            </div>
+
+            {!isSubmitting && (
+              <button
+                type="button"
+                onClick={() => setSubmissionStatus({ type: 'idle', message: '' })}
+                className="shrink-0 rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                aria-label="Dismiss notification"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
       <Link 
         href="/" 
         className="inline-block mb-6 text-sm font-semibold text-zinc-400 hover:text-cyan-400 transition-colors"
@@ -306,8 +380,9 @@ export default function RegistrationForm() {
             <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
           </div>
 
-          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg disabled:cursor-not-allowed disabled:opacity-60">
-            SUBMIT HACKATHON REGISTRATION →
+          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:cursor-not-allowed disabled:opacity-60">
+            <span className="sm:hidden">SUBMIT →</span>
+            <span className="hidden sm:inline">SUBMIT HACKATHON REGISTRATION →</span>
           </button>
         </form>
       )}
@@ -322,26 +397,11 @@ export default function RegistrationForm() {
           <div className="flex justify-center my-4 min-h-[65px]">
             <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
           </div>
-          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg disabled:cursor-not-allowed disabled:opacity-60">
-            SUBMIT WORKSHOP REGISTRATION →
+          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:cursor-not-allowed disabled:opacity-60">
+            <span className="sm:hidden">SUBMIT →</span>
+            <span className="hidden sm:inline">SUBMIT WORKSHOP REGISTRATION →</span>
           </button>
         </form>
-      )}
-
-      {isSubmitting && (
-        <p role="status" aria-live="polite" className="mt-6 text-center text-sm text-cyan-400">
-          Submitting your registration...
-        </p>
-      )}
-
-      {!isSubmitting && submissionStatus.type !== 'idle' && (
-        <p
-          role={submissionStatus.type === 'error' ? 'alert' : 'status'}
-          aria-live="polite"
-          className={`mt-6 text-center text-sm ${submissionStatus.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}
-        >
-          {submissionStatus.message}
-        </p>
       )}
 
     </div>
