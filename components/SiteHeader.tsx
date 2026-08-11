@@ -35,8 +35,6 @@ function LogoMark() {
 }
 
 function getHeaderCta(stage: CountdownStage) {
-  // HACK FOR TESTING: Comment out the date check so it ALWAYS returns the active button
-  /* 
   if (stage.phase === "registration") {
     return {
       label: "Coming Soon",
@@ -44,7 +42,6 @@ function getHeaderCta(stage: CountdownStage) {
       href: undefined,
     } as const;
   }
-  */
 
   return {
     label: "Register",
