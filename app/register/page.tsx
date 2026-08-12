@@ -19,7 +19,7 @@ export default function RegisterPage() {
   // 2. The Server-Side Bounce
   // If the current time is before the launch date, boot them back to the home page
   if (now < launchDate) {
-    // redirect('/');  swamhtet <- need to comment this out after testing. 
+    redirect('/');   
   }
 
   return (
