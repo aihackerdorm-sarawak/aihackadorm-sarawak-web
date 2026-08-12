@@ -1,8 +1,11 @@
 'use client'
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useForm } from 'react-hook-form';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertCircle, CheckCircle2, LoaderCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import * as z from 'zod';
 
@@ -50,6 +53,15 @@ const hackathonSchema = z.object({
   ).optional(), 
 });
 type HackathonData = z.infer<typeof hackathonSchema>;
+
+type SubmissionStatus =
+  | { type: 'idle'; message: '' }
+  | { type: 'success' | 'error'; message: string };
+
+type RegistrationResponse = {
+  success: boolean;
+  message?: string;
+};
 
 // ==========================================
 // 2. FORM CONFIGURATIONS (The Data)
@@ -100,21 +112,95 @@ const memberFields = [
 // ==========================================
 export default function RegistrationForm() {
   const [formType, setFormType] = useState<'hackathon' | 'workshop'>('hackathon');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({ type: 'idle', message: '' });
+  const submissionInProgress = React.useRef(false);
+
+  React.useEffect(() => {
+    if (submissionStatus.type === 'idle') return;
+
+    const timeout = window.setTimeout(() => {
+      setSubmissionStatus({ type: 'idle', message: '' });
+    }, 6000);
+
+    return () => window.clearTimeout(timeout);
+  }, [submissionStatus]);
 
   const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema) as any, mode: 'onChange' });
   const workshopForm = useForm<WorkshopData>({ resolver: zodResolver(workshopSchema) as any, mode: 'onChange' });
   
   const currentTeamSize = hackathonForm.watch('teamSize');
 
-  const onHackathonSubmit = (data: HackathonData) => {
-    const finalData = { ...data, members: data.members?.slice(0, data.teamSize - 1) || [] };
-    console.log('Hackathon Data:', finalData);
-    alert('Hackathon Registration Submitted!');
+  const submitRegistration = async (payload: object) => {
+    if (submissionInProgress.current) return;
+
+    submissionInProgress.current = true;
+    setIsSubmitting(true);
+    setSubmissionStatus({ type: 'idle', message: '' });
+
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json().catch(() => null) as RegistrationResponse | null;
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || 'Unable to submit your registration. Please try again.');
+      }
+
+      setSubmissionStatus({
+        type: 'success',
+        message: result.message || 'Registration submitted successfully.',
+      });
+    } catch (error) {
+      setSubmissionStatus({
+        type: 'error',
+        message: error instanceof Error
+          ? error.message
+          : 'Unable to submit your registration. Please try again.',
+      });
+    } finally {
+      submissionInProgress.current = false;
+      setIsSubmitting(false);
+    }
   };
 
-  const onWorkshopSubmit = (data: WorkshopData) => {
-    console.log('Workshop Data:', data);
-    alert('Workshop Registration Submitted!');
+  const onHackathonSubmit = async (data: HackathonData) => {
+    const teamMembers = (data.members ?? []).slice(0, data.teamSize - 1).map((member) => ({
+      fullName: member.fullName,
+      email: member.email,
+      contact: member.contact,
+      studentId: member.studentId,
+      university: member.university,
+      program: member.program,
+      yearOfStudy: member.year,
+    }));
+
+    await submitRegistration({
+      formType: 'hackathon',
+      data: {
+        teamName: data.teamName,
+        teamUniversity: data.teamUniversity,
+        teamSize: data.teamSize,
+        howDidYouHear: data.hearAboutUs,
+        teamLeader: {
+          fullName: data.leaderName,
+          email: data.leaderEmail,
+          contact: data.leaderWhatsapp,
+          university: data.leaderUniversity,
+          program: data.leaderProgram,
+          yearOfStudy: data.leaderYear,
+        },
+        teamMembers,
+      },
+    });
+  };
+
+  const onWorkshopSubmit = async (data: WorkshopData) => {
+    await submitRegistration({ formType: 'workshop', data });
   };
 
   // Helper component to render inputs OR dropdowns beautifully
@@ -126,21 +212,21 @@ export default function RegistrationForm() {
 
     // THE MAGIC: These classes create the hover and focus animations!
     const inputClasses = `
-      p-3 rounded-lg bg-zinc-900 border border-zinc-800 
-      hover:border-cyan-500/60 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]
+      p-3 rounded-xl bg-white/[0.04] backdrop-blur-sm border border-white/10 text-white placeholder:text-white/30
+      hover:border-cyan-400/40 hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]
       focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30 focus:shadow-[0_0_15px_rgba(6,182,212,0.4)]
       focus:outline-none transition-all duration-300
     `;
 
     return (
       <div key={fieldName} className="flex flex-col">
-        <label className="mb-1.5 text-sm text-zinc-300">{field.label}</label>
+        <label className="mb-1.5 text-sm text-white/70">{field.label}</label>
         
         {field.type === 'select' ? (
           <select 
             {...form.register(fieldName)}
             defaultValue=""
-            className={`${inputClasses} appearance-none`}
+            className={`${inputClasses} appearance-none [&>option]:bg-[#030303]`}
           >
             <option value="" disabled>Select year...</option>
             {field.options.map((opt: string) => (
@@ -162,21 +248,83 @@ export default function RegistrationForm() {
   };
 
   return (
-    <div className="p-8 bg-zinc-950/80 backdrop-blur-md border border-zinc-800 rounded-2xl max-w-3xl w-full mx-auto text-white shadow-xl">
+    <div className="p-6 sm:p-8 bg-white/[0.045] backdrop-blur-md border border-white/10 rounded-[30px] max-w-3xl w-full mx-auto text-white shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      {(isSubmitting || submissionStatus.type !== 'idle') && createPortal(
+        <div
+          role={submissionStatus.type === 'error' ? 'alert' : 'status'}
+          aria-live={submissionStatus.type === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
+          className="fixed inset-x-4 top-5 z-[100] flex justify-center pointer-events-none sm:top-7"
+        >
+          <div
+            className={`pointer-events-auto flex w-full max-w-md items-center gap-3 overflow-hidden rounded-xl border bg-zinc-950/95 px-4 py-3.5 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-3 duration-300 ${
+              isSubmitting
+                ? 'border-cyan-400/50 shadow-cyan-500/20'
+                : submissionStatus.type === 'success'
+                  ? 'border-emerald-400/50 shadow-emerald-500/20'
+                  : 'border-red-400/50 shadow-red-500/20'
+            }`}
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                isSubmitting
+                  ? 'bg-cyan-400/10 text-cyan-300'
+                  : submissionStatus.type === 'success'
+                    ? 'bg-emerald-400/10 text-emerald-300'
+                    : 'bg-red-400/10 text-red-300'
+              }`}
+              aria-hidden="true"
+            >
+              {isSubmitting ? (
+                <LoaderCircle className="h-5 w-5 animate-spin" />
+              ) : submissionStatus.type === 'success' ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <AlertCircle className="h-5 w-5" />
+              )}
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold tracking-wide text-white">
+                {isSubmitting
+                  ? 'Submitting registration'
+                  : submissionStatus.type === 'success'
+                    ? 'Registration received'
+                    : 'Submission unsuccessful'}
+              </p>
+              <p className="mt-0.5 text-sm leading-5 text-zinc-300">
+                {isSubmitting ? 'Please wait while we secure your spot...' : submissionStatus.message}
+              </p>
+            </div>
+
+            {!isSubmitting && (
+              <button
+                type="button"
+                onClick={() => setSubmissionStatus({ type: 'idle', message: '' })}
+                className="shrink-0 rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                aria-label="Dismiss notification"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
       <Link 
         href="/" 
-        className="inline-block mb-6 text-sm font-semibold text-zinc-400 hover:text-cyan-400 transition-colors"
+        className="inline-block mb-6 text-sm font-semibold text-white/50 hover:text-cyan-400 transition-colors"
       >
         ← Back to Home
       </Link>
-      <h2 className="text-3xl font-bold mb-6 tracking-tight text-center">Registration</h2>
+      <h2 className="text-3xl sm:text-4xl font-black uppercase tracking-[-0.06em] mb-8 text-center text-white">Registration</h2>
       
       {/* TAB SWITCHER */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-black p-2 rounded-xl border border-zinc-800">
-        <button type="button" onClick={() => setFormType('hackathon')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'hackathon' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-white/[0.03] p-2 rounded-2xl border border-white/10">
+        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('hackathon'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-xl font-bold uppercase tracking-[0.18em] text-[11px] transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'hackathon' ? 'bg-white text-black shadow-[0_0_20px_rgba(0,245,255,0.25)]' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
           Hackathon Participation
         </button>
-        <button type="button" onClick={() => setFormType('workshop')} className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all ${formType === 'workshop' ? 'bg-cyan-500 text-black' : 'text-zinc-400 hover:text-white'}`}>
+        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('workshop'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-xl font-bold uppercase tracking-[0.18em] text-[11px] transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'workshop' ? 'bg-white text-black shadow-[0_0_20px_rgba(0,245,255,0.25)]' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
           Workshop Participation
         </button>
       </div>
@@ -190,7 +338,7 @@ export default function RegistrationForm() {
         <form onSubmit={hackathonForm.handleSubmit(onHackathonSubmit)} className="space-y-8 animate-in fade-in duration-300">
           
           <div className="space-y-4">
-            <h3 className="text-xl font-bold border-b border-zinc-800 pb-2 text-cyan-400">Team Information</h3>
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60 border-b border-white/10 pb-2">Team Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Render regular team fields via mapping */}
               {hackathonTeamFields.map(field => renderInput(field, hackathonForm))}
@@ -198,7 +346,7 @@ export default function RegistrationForm() {
               {/* Dropdown needs manual handling because it's a select, not an input */}
               <div className="flex flex-col">
                 <label className="mb-1.5 text-sm text-zinc-300">Team Size</label>
-                <select {...hackathonForm.register('teamSize')} className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 focus:border-cyan-400 focus:outline-none appearance-none">
+                <select {...hackathonForm.register('teamSize')} className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:border-cyan-400 focus:outline-none appearance-none [&>option]:bg-[#030303]">
                   {[1, 2, 3, 4, 5].map(num => <option key={num} value={num}>{num} Person{num > 1 ? 's' : ' (Solo)'}</option>)}
                 </select>
               </div>
@@ -206,7 +354,7 @@ export default function RegistrationForm() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-xl font-bold border-b border-zinc-800 pb-2 text-cyan-400">Team Leader</h3>
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60 border-b border-white/10 pb-2">Team Leader</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Render leader fields via mapping */}
               {hackathonLeaderFields.map(field => renderInput(field, hackathonForm))}
@@ -215,10 +363,10 @@ export default function RegistrationForm() {
 
           {currentTeamSize > 1 && (
             <div className="space-y-6 pt-4">
-              <h3 className="text-xl font-bold border-b border-zinc-800 pb-2 text-cyan-400">Team Members</h3>
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60 border-b border-white/10 pb-2">Team Members</h3>
               {Array.from({ length: currentTeamSize - 1 }).map((_, index) => (
-                <div key={index} className="p-5 border border-zinc-700/50 rounded-xl bg-black/40 space-y-4">
-                  <h4 className="text-white font-bold bg-zinc-800/50 inline-block px-3 py-1 rounded-md">Member {index + 1}</h4>
+                <div key={index} className="p-5 border border-white/10 rounded-2xl bg-white/[0.03] space-y-4">
+                  <h4 className="text-white font-bold bg-white/10 inline-block px-3 py-1 rounded-md">Member {index + 1}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Render dynamic member fields via mapping */}
                     {memberFields.map(field => renderInput(field, hackathonForm, `members.${index}`))}
@@ -228,8 +376,13 @@ export default function RegistrationForm() {
             </div>
           )}
 
-          <button type="submit" className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg">
-            SUBMIT HACKATHON REGISTRATION →
+          <div className="flex justify-center my-4 min-h-[65px]">
+            <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
+          </div>
+
+          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:cursor-not-allowed disabled:opacity-60">
+            <span className="sm:hidden">SUBMIT →</span>
+            <span className="hidden sm:inline">SUBMIT HACKATHON REGISTRATION →</span>
           </button>
         </form>
       )}
@@ -241,8 +394,12 @@ export default function RegistrationForm() {
             {/* Render workshop fields via mapping */}
             {workshopFields.map(field => renderInput(field, workshopForm))}
           </div>
-          <button type="submit" className="w-full bg-white text-black font-bold py-4 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-lg">
-            SUBMIT WORKSHOP REGISTRATION →
+          <div className="flex justify-center my-4 min-h-[65px]">
+            <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
+          </div>
+          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:cursor-not-allowed disabled:opacity-60">
+            <span className="sm:hidden">SUBMIT →</span>
+            <span className="hidden sm:inline">SUBMIT WORKSHOP REGISTRATION →</span>
           </button>
         </form>
       )}
