@@ -266,7 +266,6 @@ async function handleHackathon(data: unknown): Promise<NextResponse> {
 
 export async function POST(request: Request) {
   const ipAddress = getClientIp(request);
-  console.log("Incoming registration request from IP:", ipAddress);
 
   // Rate limit check FIRST — before parsing/validating anything,
   // so malformed requests can't bypass it
