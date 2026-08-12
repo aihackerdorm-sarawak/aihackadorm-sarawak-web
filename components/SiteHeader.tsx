@@ -21,13 +21,13 @@ const navItems = [
 
 function LogoMark() {
   return (
-    <span className="relative flex h-10 w-[140px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+    <span className="relative flex h-16 w-[220px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
       <Image
         src="/AI-Hackadorm-Nav.jpg"
         alt="AI HackerDorm Sarawak"
         fill
         priority
-        sizes="140px"
+        sizes="190px"
         className="object-contain p-1.5"
       />
     </span>
