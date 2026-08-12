@@ -265,6 +265,22 @@ async function handleHackathon(data: unknown): Promise<NextResponse> {
 }
 
 export async function POST(request: Request) {
+  const ipAddress = getClientIp(request);
+
+  // Rate limit check FIRST — before parsing/validating anything,
+  // so malformed requests can't bypass it
+  const allowed = await checkRateLimit(ipAddress);
+  if (!allowed) {
+    return errorResponse(
+      {
+        success: false,
+        error_code: "RATE_LIMITED",
+        message: "Too many attempts. Please try again in a few minutes.",
+      },
+      429
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -284,21 +300,6 @@ export async function POST(request: Request) {
       message: "formType must be \"workshop\" or \"hackathon\"",
       field: "formType",
     });
-  }
-
-  const ipAddress = getClientIp(request);
-  const rateLimitKey = `${ipAddress}:${formType}`;
-
-  const allowed = await checkRateLimit(rateLimitKey);
-  if (!allowed) {
-    return errorResponse(
-      {
-        success: false,
-        error_code: "RATE_LIMITED",
-        message: "Too many attempts. Please try again in a few minutes.",
-      },
-      429
-    );
   }
 
   try {
