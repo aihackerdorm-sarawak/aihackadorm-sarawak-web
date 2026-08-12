@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { appendRows, ensureTabWithHeaders, getSheetsClient, getSheetsEnv, getTabName } from "@/lib/sheets";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   FORMS,
   HACKATHON_LEADER_FIELDS,
@@ -156,6 +157,14 @@ function flattenHackathon(
   return rows;
 }
 
+function getClientIp(request: Request): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  return request.headers.get("x-real-ip") ?? "unknown";
+}
+
 async function handleWorkshop(data: unknown): Promise<NextResponse> {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return errorResponse({ success: false, error_code: "VALIDATION_ERROR", message: "Invalid payload shape" });
@@ -256,6 +265,23 @@ async function handleHackathon(data: unknown): Promise<NextResponse> {
 }
 
 export async function POST(request: Request) {
+  const ipAddress = getClientIp(request);
+  console.log("Incoming registration request from IP:", ipAddress);
+
+  // Rate limit check FIRST — before parsing/validating anything,
+  // so malformed requests can't bypass it
+  const allowed = await checkRateLimit(ipAddress);
+  if (!allowed) {
+    return errorResponse(
+      {
+        success: false,
+        error_code: "RATE_LIMITED",
+        message: "Too many attempts. Please try again in a few minutes.",
+      },
+      429
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
