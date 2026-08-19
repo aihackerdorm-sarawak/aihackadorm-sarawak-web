@@ -33,6 +33,9 @@ type ScheduleItem = {
   copy: string;
   badge?: string;
   status?: string;
+  /** Where the milestone's register CTA points. Placeholder until the
+      workshop registration pages are live. */
+  registerHref?: string;
 };
 
 type CountdownValues = {
@@ -55,13 +58,27 @@ const scheduleItems: ScheduleItem[] = [
   },
   {
     id: "workshop",
-    label: "Pre-Hackathon Workshop",
+    label: "Pre-Hackathon Workshop 1",
     date: "Oct 2, 2026",
     hint: "Tentative",
-    title: "Pre-hackathon workshop",
+    title: "Pre-hackathon workshop 1",
     copy:
       "A tentative warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
     badge: "Tentative",
+    // Placeholder — point to the live workshop registration page when it exists.
+    registerHref: "/register?form=workshop",
+  },
+  {
+    id: "workshop-2",
+    label: "Pre-Hackathon Workshop 2",
+    date: "Oct 5, 2026",
+    hint: "Tentative",
+    title: "Pre-hackathon workshop 2",
+    copy:
+      "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
+    badge: "Tentative",
+    // Placeholder — point to the live workshop registration page when it exists.
+    registerHref: "/register?form=workshop",
   },
   {
     id: "main-event",
@@ -74,6 +91,11 @@ const scheduleItems: ScheduleItem[] = [
     status: "3-day event",
   },
 ];
+
+// Id of the first workshop milestone — the hero "Workshops" button focuses
+// this point on the timeline when clicked.
+const FIRST_WORKSHOP_ID =
+  scheduleItems.find((item) => item.id.startsWith("workshop"))?.id ?? "workshop";
 
 const benefitCards = ["To Be Announced", "To Be Announced", "To Be Announced"];
 
@@ -548,9 +570,14 @@ function CountdownSection({ stage, values }: { stage: CountdownStage; values: Co
   );
 }
 
-function HeroSection({ stage }: { stage: CountdownStage }) {
+function HeroSection({
+  stage,
+  onWorkshopsClick,
+}: {
+  stage: CountdownStage;
+  onWorkshopsClick: () => void;
+}) {
   const reducedMotion = useReducedMotion() ?? true;
-  const navigate = useScrollToId();
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLElement>();
 
@@ -616,10 +643,10 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
             <RegistrationCta stage={stage} />
             <button
               type="button"
-              onClick={() => navigate("schedule")}
+              onClick={onWorkshopsClick}
               className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
             >
-              Learn More
+              Workshops
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -673,8 +700,13 @@ function SponsorsSection() {
   );
 }
 
-function ScheduleSection() {
-  const [selectedId, setSelectedId] = useState(scheduleItems[0].id);
+function ScheduleSection({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
   const selectedIndex = Math.max(
     0,
     scheduleItems.findIndex((item) => item.id === selectedId)
@@ -685,7 +717,7 @@ function ScheduleSection() {
 
   const goToIndex = (index: number) => {
     const clamped = Math.max(0, Math.min(scheduleItems.length - 1, index));
-    setSelectedId(scheduleItems[clamped].id);
+    onSelect(scheduleItems[clamped].id);
   };
 
   const atStart = selectedIndex === 0;
@@ -719,10 +751,10 @@ function ScheduleSection() {
       >
         <div className="space-y-6">
           <div ref={timelineScrollRef} className="overflow-x-auto pb-4">
-            <div className="relative min-w-[620px] px-3 pt-2">
+            <div className="relative min-w-[800px] px-3 pt-2">
               {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
               <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 {scheduleItems.map((item, index) => {
                   const active = item.id === selectedId;
 
@@ -733,7 +765,7 @@ function ScheduleSection() {
                         milestoneRefs.current[index] = el;
                       }}
                       type="button"
-                      onClick={() => setSelectedId(item.id)}
+                      onClick={() => onSelect(item.id)}
                       aria-pressed={active}
                       className="relative flex min-h-32 flex-col items-center gap-3 text-center"
                     >
@@ -800,6 +832,15 @@ function ScheduleSection() {
                 </span>
               </div>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
+              {selected.registerHref ? (
+                <a
+                  href={selected.registerHref}
+                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-colors hover:bg-cyan-400"
+                >
+                  Register for this workshop
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
               <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
                 <span>{selected.date}</span>
                 <span>-</span>
@@ -1051,7 +1092,13 @@ function PartnerSocialSection() {
   );
 }
 
-function WaveZone() {
+function WaveZone({
+  selectedMilestoneId,
+  onSelectMilestone,
+}: {
+  selectedMilestoneId: string;
+  onSelectMilestone: (id: string) => void;
+}) {
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLDivElement>();
 
@@ -1071,7 +1118,7 @@ function WaveZone() {
 
       <div className="relative z-10 mx-auto w-full max-w-7xl space-y-6">
         <SponsorsSection />
-        <ScheduleSection />
+        <ScheduleSection selectedId={selectedMilestoneId} onSelect={onSelectMilestone} />
         <BenefitsSection />
         <FaqSection />
         <CollaboratorsSection />
@@ -1085,6 +1132,12 @@ function WaveZone() {
 function LandingContent() {
   const navigate = useScrollToId();
   const countdown = useCountdownState();
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState(scheduleItems[0].id);
+
+  const handleWorkshopsClick = () => {
+    setSelectedMilestoneId(FIRST_WORKSHOP_ID);
+    navigate("schedule");
+  };
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#030303] text-white">
@@ -1093,9 +1146,12 @@ function LandingContent() {
 
       <div className="relative z-10">
         <SiteHeader onNavigate={navigate} stage={countdown.stage} />
-        <HeroSection stage={countdown.stage} />
+        <HeroSection stage={countdown.stage} onWorkshopsClick={handleWorkshopsClick} />
         <CountdownSection stage={countdown.stage} values={countdown.values} />
-        <WaveZone />
+        <WaveZone
+          selectedMilestoneId={selectedMilestoneId}
+          onSelectMilestone={setSelectedMilestoneId}
+        />
         <SiteFooter />
       </div>
     </main>
