@@ -40,9 +40,10 @@ const validHackathon = {
   formType: "hackathon",
   data: {
     teamName: "The Innovators",
-    teamUniversity: "Swinburne University",
     teamSize: 3,
     howDidYouHear: "Instagram",
+    termsAccepted: true,
+    teamConsentAccepted: true,
     teamLeader: {
       fullName: "Jane Leader",
       email: "jane@example.com",
@@ -56,7 +57,6 @@ const validHackathon = {
         fullName: "John Member",
         email: "john@example.com",
         contact: "+60 12-444-5555",
-        studentId: "101234567",
         university: "Swinburne University",
         program: "Computer Science",
         yearOfStudy: "Year 2",
@@ -65,7 +65,6 @@ const validHackathon = {
         fullName: "Jill Member",
         email: "jill@example.com",
         contact: "+60 13-666-7777",
-        studentId: "107654321",
         university: "Swinburne University",
         program: "IT",
         yearOfStudy: "Year 1",
@@ -174,6 +173,21 @@ describe("POST /api/register — workshop", () => {
 });
 
 describe("POST /api/register — hackathon", () => {
+  it.each([
+    ["termsAccepted", "Terms & Conditions"],
+    ["teamConsentAccepted", "team members"],
+  ])("rejects when %s is not confirmed", async (field, messageFragment) => {
+    const { status, body } = await postJson({
+      ...validHackathon,
+      data: { ...validHackathon.data, [field]: false },
+    });
+
+    expect(status).toBe(400);
+    expect(body).toMatchObject({ success: false, field });
+    expect(String(body.message)).toContain(messageFragment);
+    expect(mockedAppendRows).not.toHaveBeenCalled();
+  });
+
   it("appends one row per person (leader + members) with team meta repeated", async () => {
     const { status, body } = await postJson(validHackathon);
 
@@ -188,14 +202,14 @@ describe("POST /api/register — hackathon", () => {
       expect(row).toHaveLength(13);
       expect(row[0]).toMatch(TIMESTAMP_PATTERN);
       // Meta columns (2..5) are repeated verbatim on every row.
-      expect(row.slice(2, 6)).toEqual(["The Innovators", "Swinburne University", "3", "Instagram"]);
+      expect(row.slice(2, 6)).toEqual(["The Innovators", "", "3", "Instagram"]);
     }
 
     expect(leader).toEqual([
       expect.stringMatching(TIMESTAMP_PATTERN),
       "Leader",
       "The Innovators",
-      "Swinburne University",
+      "",
       "3",
       "Instagram",
       "Jane Leader",
@@ -208,9 +222,9 @@ describe("POST /api/register — hackathon", () => {
     ]);
 
     expect(member1[1]).toBe("Member");
-    expect(member1[9]).toBe("101234567");
+    expect(member1[9]).toBe("");
     expect(member2[1]).toBe("Member");
-    expect(member2[9]).toBe("107654321");
+    expect(member2[9]).toBe("");
   });
 
   it("accepts teamSize as a JSON number or a numeric string", async () => {
@@ -218,13 +232,13 @@ describe("POST /api/register — hackathon", () => {
 
     await postJson({
       ...validHackathon,
-      data: { ...validHackathon.data, teamSize: "2", teamMembers: validHackathon.data.teamMembers.slice(0, 1) },
+      data: { ...validHackathon.data, teamSize: "4", teamMembers: [...validHackathon.data.teamMembers, validHackathon.data.teamMembers[0]] },
     });
 
     expect(mockedAppendRows).toHaveBeenCalledTimes(2);
     const rows = mockedAppendRows.mock.calls;
     expect(rows[0][1][0][4]).toBe("3");
-    expect(rows[1][1][0][4]).toBe("2");
+    expect(rows[1][1][0][4]).toBe("4");
   });
 
   it("rejects when team size does not match the number of members", async () => {
@@ -238,8 +252,8 @@ describe("POST /api/register — hackathon", () => {
     expect(String(body.message)).toContain("does not match");
   });
 
-  it("rejects team sizes outside 1–5", async () => {
-    for (const teamSize of [0, 6, "abc"]) {
+  it("rejects team sizes outside 3–5", async () => {
+    for (const teamSize of [2, 6, "abc"]) {
       const { status, body } = await postJson({
         ...validHackathon,
         data: { ...validHackathon.data, teamSize },
@@ -263,20 +277,17 @@ describe("POST /api/register — hackathon", () => {
     expect(body).toMatchObject({ field: "teamLeader.email" });
   });
 
-  it("rejects a member missing studentId", async () => {
-    // teamSize must still match the member count so the member-level check is
-    // reached (team-size consistency is validated first).
+  it("accepts a member without studentId", async () => {
     const { status, body } = await postJson({
       ...validHackathon,
       data: {
         ...validHackathon.data,
-        teamSize: 2,
-        teamMembers: [{ ...validHackathon.data.teamMembers[0], studentId: "" }],
+        teamMembers: validHackathon.data.teamMembers,
       },
     });
 
-    expect(status).toBe(400);
-    expect(body).toMatchObject({ field: "teamMembers[0].studentId" });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ success: true, rowsAppended: 3 });
   });
 
   it("rejects non-array teamMembers", async () => {
