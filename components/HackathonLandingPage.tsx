@@ -59,8 +59,8 @@ const scheduleItems: ScheduleItem[] = [
   {
     id: "workshop",
     label: "Pre-Hackathon Workshop 1",
-    date: "Oct 2, 2026",
-    hint: "Tentative",
+    date: "Sep 10, 2026",
+    hint: "Warm-up session",
     title: "Pre-hackathon workshop 1",
     copy:
       "A tentative warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
@@ -72,7 +72,7 @@ const scheduleItems: ScheduleItem[] = [
     id: "workshop-2",
     label: "Pre-Hackathon Workshop 2",
     date: "Oct 5, 2026",
-    hint: "Tentative",
+    hint: "Deep dive session",
     title: "Pre-hackathon workshop 2",
     copy:
       "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
@@ -725,9 +725,9 @@ function ScheduleSection({
 
   // The timeline row scrolls horizontally on narrow/mobile viewports (it's
   // wider than the screen there). Tapping a milestone directly is always
-  // visible already, but the prev/next arrow buttons below can move the
-  // active dot off-screen — scroll it back into view (centered) whichever way
-  // selection changed, so the highlighted point is never hidden. Scrolled
+  // visible already, but the prev/next arrow buttons on the timeline can move
+  // the active dot off-screen — scroll it back into view (centered) whichever
+  // way selection changed, so the highlighted point is never hidden. Scrolled
   // manually via scrollTo (horizontal only), NOT scrollIntoView: that method
   // walks up to find a scrollable ancestor per axis, and since nothing here
   // has vertical overflow, its `block` option falls back to the page itself —
@@ -750,101 +750,70 @@ function ScheduleSection({
         copy="Tap a milestone above, or use the arrows, to see its details below."
       >
         <div className="space-y-6">
-          <div ref={timelineScrollRef} className="overflow-x-auto pb-4">
-            <div className="relative min-w-[800px] px-3 pt-2">
-              {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
-              <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />
-              <div className="grid grid-cols-4 gap-4">
-                {scheduleItems.map((item, index) => {
-                  const active = item.id === selectedId;
-
-                  return (
-                    <button
-                      key={item.id}
-                      ref={(el) => {
-                        milestoneRefs.current[index] = el;
-                      }}
-                      type="button"
-                      onClick={() => onSelect(item.id)}
-                      aria-pressed={active}
-                      className="relative flex min-h-32 flex-col items-center gap-3 text-center"
-                    >
-                      <div className="flex flex-col items-center gap-2 px-3">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/45">
-                          {item.hint}
-                        </p>
-                        <h3
-                          className={`text-[11px] font-semibold uppercase tracking-[0.24em] transition-colors ${
-                            active ? "text-white" : "text-white/60"
-                          }`}
-                        >
-                          {item.label}
-                        </h3>
-                        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/32">
-                          {item.date}
-                        </p>
-                      </div>
-
-                      <span className="mt-auto flex h-8 items-center justify-center">
-                        <span
-                          className={`relative z-10 block h-4 w-4 rounded-full border transition-all ${
-                            active
-                              ? "border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.08)]"
-                              : "border-white/45 bg-[#030303]"
-                          }`}
-                        />
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 min-[391px]:gap-2 sm:gap-3">
+          {/* The connecting line sits 32px above this row's bottom (scroller
+              pb-4 + line bottom-4). The arrows are items-end aligned, so each
+              gets a bottom margin that lifts its midpoint onto that line:
+              h-8  → 32 − 16 = 16px (mb-4); h-12 → 32 − 24 = 8px (mb-2).
+              If the button sizes change, update these margins to match. */}
+          <div className="flex items-end gap-1 min-[391px]:gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => goToIndex(selectedIndex - 1)}
               disabled={atStart}
               aria-label="Previous milestone"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70 min-[391px]:h-12 min-[391px]:w-12"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70 min-[391px]:h-12 min-[391px]:w-12 mb-4 min-[391px]:mb-2"
             >
               <ChevronLeft className="h-4 w-4 min-[391px]:h-5 min-[391px]:w-5" />
             </button>
 
-            <div className="min-w-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-black/30 p-4 sm:p-5">
-              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                Shared detail card
-              </p>
-              <h3 className="mt-2 max-w-full break-words text-xl font-black uppercase leading-tight tracking-[-0.05em] text-white sm:text-2xl">
-                {selected.title}
-              </h3>
-              <div className="mt-3 flex items-center gap-3">
-                <span
-                  className={`rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] uppercase tracking-[0.28em] text-white/45 ${
-                    selected.badge ? "" : "invisible"
-                  }`}
-                >
-                  {selected.badge ?? "Tentative"}
-                </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
-                  {selectedIndex + 1} / {scheduleItems.length}
-                </span>
-              </div>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
-              {selected.registerHref ? (
-                <a
-                  href={selected.registerHref}
-                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-colors hover:bg-cyan-400"
-                >
-                  Register for this workshop
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </a>
-              ) : null}
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
-                <span>{selected.date}</span>
-                <span>-</span>
-                <span>{selected.status ?? "Tentative"}</span>
+            <div ref={timelineScrollRef} className="min-w-0 flex-1 overflow-x-auto pb-4">
+              <div className="relative min-w-[800px] px-3 pt-2">
+                {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
+                <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />
+                <div className="grid grid-cols-4 gap-4">
+                  {scheduleItems.map((item, index) => {
+                    const active = item.id === selectedId;
+
+                    return (
+                      <button
+                        key={item.id}
+                        ref={(el) => {
+                          milestoneRefs.current[index] = el;
+                        }}
+                        type="button"
+                        onClick={() => onSelect(item.id)}
+                        aria-pressed={active}
+                        className="relative flex min-h-32 flex-col items-center gap-3 text-center"
+                      >
+                        <div className="flex flex-col items-center gap-2 px-3">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/45">
+                            {item.hint}
+                          </p>
+                          <h3
+                            className={`text-[11px] font-semibold uppercase tracking-[0.24em] transition-colors ${
+                              active ? "text-white" : "text-white/60"
+                            }`}
+                          >
+                            {item.label}
+                          </h3>
+                          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/32">
+                            {item.date}
+                          </p>
+                        </div>
+
+                        <span className="mt-auto flex h-8 items-center justify-center">
+                          <span
+                            className={`relative z-10 block h-4 w-4 rounded-full border transition-all ${
+                              active
+                                ? "border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.08)]"
+                                : "border-white/45 bg-[#030303]"
+                            }`}
+                          />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -853,10 +822,43 @@ function ScheduleSection({
               onClick={() => goToIndex(selectedIndex + 1)}
               disabled={atEnd}
               aria-label="Next milestone"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70 min-[391px]:h-12 min-[391px]:w-12"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-white/70 min-[391px]:h-12 min-[391px]:w-12 mb-4 min-[391px]:mb-2"
             >
               <ChevronRight className="h-4 w-4 min-[391px]:h-5 min-[391px]:w-5" />
             </button>
+          </div>
+
+          <div className="overflow-hidden rounded-[24px] border border-white/10 bg-black/30 p-4 sm:p-5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+              Shared detail card
+            </p>
+            <h3 className="mt-2 max-w-full break-words text-xl font-black uppercase leading-tight tracking-[-0.05em] text-white sm:text-2xl">
+              {selected.title}
+            </h3>
+            <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
+              {selectedIndex + 1} / {scheduleItems.length}
+            </p>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
+            {selected.registerHref ? (
+              <a
+                href={selected.registerHref}
+                className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-colors hover:bg-cyan-400"
+              >
+                Register for this workshop
+                <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
+              <span>{selected.date}</span>
+              <span>-</span>
+              {selected.badge ? (
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[9px] uppercase tracking-[0.28em] text-white/45">
+                  {selected.badge}
+                </span>
+              ) : selected.status ? (
+                <span>{selected.status}</span>
+              ) : null}
+            </div>
           </div>
         </div>
       </SectionShell>
