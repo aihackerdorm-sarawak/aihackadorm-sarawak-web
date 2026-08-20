@@ -1,6 +1,12 @@
 "use client";
 
-import { Component, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  Component,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
@@ -19,10 +25,15 @@ import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { CountdownScene } from "./CountdownScene";
 import WaveBackground from "./WaveBackground";
-import { formatCountdownParts, getCountdownStage, padTwo, type CountdownStage } from "@/lib/countdown";
+import {
+  type CountdownStage,
+  formatCountdownParts,
+  getCountdownStage,
+  padTwo,
+} from "@/lib/countdown";
 import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
 import { FaqAccordion } from "./Faq";
-import RegistrationForm from './RegistrationForm';
+import RegistrationForm from "./RegistrationForm";
 
 type ScheduleItem = {
   id: string;
@@ -100,13 +111,21 @@ const FIRST_WORKSHOP_ID =
 const benefitCards = ["To Be Announced", "To Be Announced", "To Be Announced"];
 
 const partnerLinks = [
-  { label: "Instagram", handle: "@aihackerdorm.sarawak", href: "https://www.instagram.com/aihackerdorm.sarawak/" },
+  {
+    label: "Instagram",
+    handle: "@aihackerdorm.sarawak",
+    href: "https://www.instagram.com/aihackerdorm.sarawak/",
+  },
   {
     label: "LinkedIn",
     handle: "Borneo Hackathon",
     href: "https://www.linkedin.com/in/borneo-hackathon-6b80bb421/",
   },
-  { label: "Email", handle: "team@aihackerdorm.com", href: "mailto:team@aihackerdorm.com" },
+  {
+    label: "Email",
+    handle: "team@aihackerdorm.com",
+    href: "mailto:team@aihackerdorm.com",
+  },
 ];
 
 function useScrollToId() {
@@ -179,7 +198,7 @@ function useSectionObserver<T extends HTMLElement>() {
       {
         threshold: 0,
         rootMargin: "200px 0px",
-      }
+      },
     );
 
     observer.observe(element);
@@ -203,11 +222,19 @@ function SectionShell({
   return (
     <div className="rounded-[30px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur-md sm:p-7">
       <div className="max-w-3xl space-y-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60">{eyebrow}</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60">
+          {eyebrow}
+        </p>
         <h2 className="text-3xl font-black uppercase tracking-[-0.06em] text-white sm:text-5xl">
           {title}
         </h2>
-        {copy ? <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">{copy}</p> : null}
+        {copy
+          ? (
+            <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
+              {copy}
+            </p>
+          )
+          : null}
       </div>
       <div className="mt-8">{children}</div>
     </div>
@@ -230,7 +257,11 @@ function PrimaryButton({
 
   if (href && !disabled) {
     return (
-      <a href={href} className={className} data-text={typeof children === "string" ? children : undefined}>
+      <a
+        href={href}
+        className={className}
+        data-text={typeof children === "string" ? children : undefined}
+      >
         {children}
         <ArrowRight className="h-3.5 w-3.5" />
       </a>
@@ -278,7 +309,6 @@ function RegistrationCta({ stage }: { stage: CountdownStage }) {
     </PrimaryButton>
   );
 }
-
 
 function CountdownLabels() {
   return (
@@ -432,7 +462,9 @@ function CountdownFallback({
           <h3 className="mt-4 text-3xl font-black uppercase tracking-[-0.06em] text-white sm:text-5xl">
             AI HackerDorm 2026 - Completed
           </h3>
-          {message ? <p className="mt-4 text-sm text-white/55">{message}</p> : null}
+          {message
+            ? <p className="mt-4 text-sm text-white/55">{message}</p>
+            : null}
         </div>
       </div>
     );
@@ -446,7 +478,10 @@ function CountdownFallback({
         ["minutes", "Min"],
         ["seconds", "Sec"],
       ].map(([key, label]) => (
-        <div key={key} className="rounded-[24px] border border-white/10 bg-white/[0.035] px-4 py-5">
+        <div
+          key={key}
+          className="rounded-[24px] border border-white/10 bg-white/[0.035] px-4 py-5"
+        >
           <div className="text-[clamp(2.1rem,8vw,4rem)] font-black leading-none tracking-[-0.08em] text-white">
             {values[key as keyof typeof values]}
           </div>
@@ -463,7 +498,9 @@ function CountdownFallback({
 // requires a referentially stable subscribe).
 const subscribeNoop = () => () => {};
 
-function CountdownSection({ stage, values }: { stage: CountdownStage; values: CountdownValues }) {
+function CountdownSection(
+  { stage, values }: { stage: CountdownStage; values: CountdownValues },
+) {
   const reducedMotion = useReducedMotion() ?? true;
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLDivElement>();
@@ -481,7 +518,7 @@ function CountdownSection({ stage, values }: { stage: CountdownStage; values: Co
   const isMounted = useSyncExternalStore(
     subscribeNoop,
     () => true,
-    () => false
+    () => false,
   );
   const [quality] = useState<QualityTier>(() =>
     typeof window === "undefined" ? "medium" : getDeviceQuality()
@@ -522,49 +559,54 @@ function CountdownSection({ stage, values }: { stage: CountdownStage; values: Co
             Countdown
           </p>
           <h2 className="text-4xl font-black uppercase tracking-[-0.08em] text-white sm:text-6xl lg:text-7xl">
-            {stage.completed ? "The event has finished." : `Counting down to ${stage.label}.`}
+            {stage.completed
+              ? "The event has finished."
+              : `Counting down to ${stage.label}.`}
           </h2>
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
-            {stage.eyebrow}.{" "}
-            {stage.phase === "event-live"
+            {stage.eyebrow}. {stage.phase === "event-live"
               ? "The main event is live — 3 days on the clock until it wraps up."
               : "This page updates automatically as each milestone — registration, the workshop, and the main event — arrives."}
           </p>
         </div>
 
-        {graphicsEnabled && !stage.completed ? (
-          <CountdownWebGLErrorBoundary
-            values={values}
-            stageLabel={stage.eyebrow}
-            completed={stage.completed}
-            message={stage.message}
-          >
-            <CountdownWebGLFrame
-              active={isInView}
-              reducedMotion={reducedMotion}
-              quality={quality}
-              headerHeightPx={headerHeightPx}
+        {graphicsEnabled && !stage.completed
+          ? (
+            <CountdownWebGLErrorBoundary
               values={values}
+              stageLabel={stage.eyebrow}
+              completed={stage.completed}
+              message={stage.message}
+            >
+              <CountdownWebGLFrame
+                active={isInView}
+                reducedMotion={reducedMotion}
+                quality={quality}
+                headerHeightPx={headerHeightPx}
+                values={values}
+              />
+            </CountdownWebGLErrorBoundary>
+          )
+          : (
+            <CountdownFallback
+              values={values}
+              stageLabel={stage.eyebrow}
+              completed={stage.completed}
+              message={stage.message}
             />
-          </CountdownWebGLErrorBoundary>
-        ) : (
-          <CountdownFallback
-            values={values}
-            stageLabel={stage.eyebrow}
-            completed={stage.completed}
-            message={stage.message}
-          />
-        )}
+          )}
 
-        {!stage.completed ? (
-          <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.36em] text-white/32">
-            <span>{stage.label}</span>
-            <span>-</span>
-            <span>
-              {values.days}:{values.hours}:{values.minutes}:{values.seconds}
-            </span>
-          </div>
-        ) : null}
+        {!stage.completed
+          ? (
+            <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.36em] text-white/32">
+              <span>{stage.label}</span>
+              <span>-</span>
+              <span>
+                {values.days}:{values.hours}:{values.minutes}:{values.seconds}
+              </span>
+            </div>
+          )
+          : null}
       </div>
     </section>
   );
@@ -587,19 +629,23 @@ function HeroSection({
       id="hero"
       className="relative isolate overflow-hidden px-4 pb-14 pt-10 sm:px-6 sm:pb-16 lg:px-8"
     >
-      {graphicsEnabled ? (
-        <div className="pointer-events-none absolute inset-0 z-0">
-          <WaveBackground active={isInView} />
-          {/* Lighter overlay so the hero wave reads as bright as the lower
+      {graphicsEnabled
+        ? (
+          <div className="pointer-events-none absolute inset-0 z-0">
+            <WaveBackground active={isInView} />
+            {
+              /* Lighter overlay so the hero wave reads as bright as the lower
               WaveZone wave. The hero is only ~one viewport tall, so an overlay
               matching WaveZone's darker END would over-dim it — keep it light
               and roughly flat, with a mild bottom fade for the paragraph/
-              buttons and to blend into the countdown section below. */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.15),rgba(3,3,3,0.45))]" />
-        </div>
-      ) : (
-        <div className="pointer-events-none absolute inset-0 z-0 bg-[#030303]" />
-      )}
+              buttons and to blend into the countdown section below. */
+            }
+            <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.15),rgba(3,3,3,0.45))]" />
+          </div>
+        )
+        : (
+          <div className="pointer-events-none absolute inset-0 z-0 bg-[#030303]" />
+        )}
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
         <div className="max-w-3xl space-y-6">
@@ -613,7 +659,9 @@ function HeroSection({
           </motion.p>
 
           <motion.h1
-            initial={reducedMotion ? false : { opacity: 0, y: 14, filter: "blur(8px)" }}
+            initial={reducedMotion
+              ? false
+              : { opacity: 0, y: 14, filter: "blur(8px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="max-w-4xl text-[clamp(3.2rem,11vw,7.8rem)] font-black uppercase leading-[0.86] tracking-[-0.08em] text-white"
@@ -621,7 +669,10 @@ function HeroSection({
             <span className="block">Build the</span>
             <span
               className="block text-cyan-300/70"
-              style={{ textShadow: "-0.045em 0 rgba(0,255,255,0.65), 0.045em 0 rgba(0,140,255,0.55)" }}
+              style={{
+                textShadow:
+                  "-0.045em 0 rgba(0,255,255,0.65), 0.045em 0 rgba(0,140,255,0.55)",
+              }}
             >
               future
             </span>
@@ -634,9 +685,9 @@ function HeroSection({
             transition={{ duration: 0.7, delay: 0.08 }}
             className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base"
           >
-            AI Hackerdorm Sarawak is a 3-day hackathon by AI HackerDorm and the Swinburne
-            Computer Science Club. Students and developers build real AI solutions under one roof
-            in Kuching, Borneo.
+            AI Hackerdorm Sarawak is a 3-day hackathon by AI HackerDorm and the
+            Swinburne Computer Science Club. Students and developers build real
+            AI solutions under one roof in Kuching, Borneo.
           </motion.p>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -652,25 +703,65 @@ function HeroSection({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:max-w-[30rem]">
-          {[
-            { label: "Hackathon", value: "3 days" },
-            { label: "Format", value: "Build + mentor" },
-            { label: "Location", value: "Kuching" },
-            { label: "Focus", value: "AI solutions" },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-md"
-            >
-              <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
-                {item.label}
-              </p>
-              <p className="mt-4 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-                {item.value}
-              </p>
+        <div className="lg:max-w-[30rem] space-y-4">
+          <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-md">
+            <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
+              Organised by
+            </p>
+            <div className="mt-4 flex items-center gap-6">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                <Image
+                  src="/AI-Hackadorm-Nav.jpg"
+                  alt="AI Hackerdorm"
+                  fill
+                  sizes="96px"
+                  className="object-contain p-2"
+                />
+              </div>
+
+              <div className="flex items-center gap-1">
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                  <Image
+                    src="/computersci-logo.png"
+                    alt="Swinburne CompSci"
+                    fill
+                    sizes="96px"
+                    className="object-contain p-2"
+                  />
+                </div>
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                  <Image
+                    src="/Swinburne-Logo.jpg"
+                    alt="Swinburne Sarawak"
+                    fill
+                    sizes="96px"
+                    className="object-contain p-1.5"
+                  />
+                </div>
+              </div>
             </div>
-          ))}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              { label: "Hackathon", value: "3 days" },
+              { label: "Format", value: "Build + mentor" },
+              { label: "Location", value: "Kuching" },
+              { label: "Focus", value: "AI Solutions" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-md"
+              >
+                <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
+                  {item.label}
+                </p>
+                <p className="mt-4 text-2xl font-black uppercase tracking-[-0.05em] text-white">
+                  {item.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -709,7 +800,7 @@ function ScheduleSection({
 }) {
   const selectedIndex = Math.max(
     0,
-    scheduleItems.findIndex((item) => item.id === selectedId)
+    scheduleItems.findIndex((item) => item.id === selectedId),
   );
   const selected = scheduleItems[selectedIndex] ?? scheduleItems[0];
   const milestoneRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -738,7 +829,8 @@ function ScheduleSection({
     if (!container || !button) {
       return;
     }
-    const target = button.offsetLeft + button.offsetWidth / 2 - container.clientWidth / 2;
+    const target = button.offsetLeft + button.offsetWidth / 2 -
+      container.clientWidth / 2;
     container.scrollTo({ left: target, behavior: "smooth" });
   }, [selectedIndex]);
 
@@ -929,7 +1021,8 @@ function CollaboratorsSection() {
             {
               name: "AI HackerDorm",
               logos: [{ src: "/AI-Hackadorm.png", alt: "AI HackerDorm logo" }],
-              copy: "Student-led community focused on building AI capability, momentum, and useful collaboration across the region.",
+              copy:
+                "Student-led community focused on building AI capability, momentum, and useful collaboration across the region.",
               url: "https://www.aihackerdorm.com/",
             },
             {
@@ -944,7 +1037,8 @@ function CollaboratorsSection() {
                   alt: "Swinburne University of Technology Sarawak Campus logo",
                 },
               ],
-              copy: "A student-led computing community at Swinburne Sarawak, connecting students with practical technology, collaboration, and industry opportunities.",
+              copy:
+                "A student-led computing community at Swinburne Sarawak, connecting students with practical technology, collaboration, and industry opportunities.",
               url: "https://www.instagram.com/swinburnecompsci/",
             },
           ].map((item) => (
@@ -980,7 +1074,9 @@ function CollaboratorsSection() {
                   {item.name}
                 </h3>
               </div>
-              <p className="mt-4 text-sm leading-7 text-white/55">{item.copy}</p>
+              <p className="mt-4 text-sm leading-7 text-white/55">
+                {item.copy}
+              </p>
             </a>
           ))}
         </div>
@@ -1010,14 +1106,19 @@ function AboutSection() {
                 "A vibrant community for students passionate about coding, technology, and innovation. Open to all backgrounds, we offer hands-on workshops, talks, and networking opportunities to enhance skills and knowledge in computer science and ICT.",
             },
           ].map((item) => (
-            <div key={item.title} className="rounded-[24px] border border-white/10 bg-black/30 p-5">
+            <div
+              key={item.title}
+              className="rounded-[24px] border border-white/10 bg-black/30 p-5"
+            >
               <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
                 Organizer profile
               </p>
               <h3 className="mt-3 text-2xl font-black uppercase tracking-[-0.05em] text-white">
                 {item.title}
               </h3>
-              <p className="mt-3 text-sm leading-7 text-white/55">{item.copy}</p>
+              <p className="mt-3 text-sm leading-7 text-white/55">
+                {item.copy}
+              </p>
             </div>
           ))}
         </div>
@@ -1043,14 +1144,17 @@ function PartnerSocialSection() {
               Partnership details coming soon.
             </h3>
             <p className="mt-4 text-sm leading-7 text-white/55">
-              Interested in partnering with us? We&apos;re finalizing sponsor and collaboration
-              details and will share them soon — reach out via our socials in the meantime.
+              Interested in partnering with us? We&apos;re finalizing sponsor
+              and collaboration details and will share them soon — reach out via
+              our socials in the meantime.
             </p>
-            {/*
+            {
+              /*
             <div className="mt-5 flex flex-wrap gap-3">
               <RegisterCta />
             </div>
-            */}
+            */
+            }
           </div>
 
           <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
@@ -1068,19 +1172,21 @@ function PartnerSocialSection() {
                 >
                   <span className="flex items-center gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/25 text-white/65">
-                      {item.label === "Email" ? (
-                        <Mail className="h-4 w-4" />
-                      ) : item.label === "LinkedIn" ? (
-                        <span className="text-[13px] font-black leading-none tracking-[-0.08em]">
-                          in
-                        </span>
-                      ) : (
-                        <Sparkles className="h-4 w-4" />
-                      )}
+                      {item.label === "Email"
+                        ? <Mail className="h-4 w-4" />
+                        : item.label === "LinkedIn"
+                        ? (
+                          <span className="text-[13px] font-black leading-none tracking-[-0.08em]">
+                            in
+                          </span>
+                        )
+                        : <Sparkles className="h-4 w-4" />}
                     </span>
                     <span className="flex flex-col">
                       <span className="text-sm font-medium">{item.label}</span>
-                      <span className="text-xs text-white/45">{item.handle}</span>
+                      <span className="text-xs text-white/45">
+                        {item.handle}
+                      </span>
                     </span>
                   </span>
                   <ArrowRight className="h-4 w-4" />
@@ -1109,14 +1215,16 @@ function WaveZone({
       ref={ref}
       className="relative isolate overflow-hidden border-t border-white/10 bg-[#030303] px-4 py-8 sm:px-6 lg:px-8"
     >
-      {graphicsEnabled ? (
-        <div className="pointer-events-none absolute inset-0 z-0">
-          <WaveBackground active={isInView} />
-          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.12),rgba(3,3,3,0.78))]" />
-        </div>
-      ) : (
-        <div className="pointer-events-none absolute inset-0 z-0 bg-[#030303]" />
-      )}
+      {graphicsEnabled
+        ? (
+          <div className="pointer-events-none absolute inset-0 z-0">
+            <WaveBackground active={isInView} />
+            <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(3,3,3,0.12),rgba(3,3,3,0.78))]" />
+          </div>
+        )
+        : (
+          <div className="pointer-events-none absolute inset-0 z-0 bg-[#030303]" />
+        )}
 
       <div className="relative z-10 mx-auto w-full max-w-7xl space-y-6">
         <SponsorsSection />
