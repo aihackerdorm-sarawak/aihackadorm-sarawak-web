@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useForm } from 'react-hook-form';
+import { get, useForm, useWatch, type FieldPath, type UseFormReturn } from 'react-hook-form';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, CheckCircle2, LoaderCircle, X } from 'lucide-react';
@@ -17,20 +17,9 @@ import * as z from 'zod';
 // Allows optional +, numbers, spaces, dashes, and parentheses between 8 and 20 characters
 const phoneRegex = /^\+?[0-9\s\-()]{8,20}$/;
 
-const workshopSchema = z.object({
-  name: z.string().min(2, 'Name is required'),
-  email: z.string().email('Please enter a valid email address'),
-  whatsapp: z.string().regex(phoneRegex, 'Invalid WhatsApp format (e.g., +60 12-345-6789)'),
-  university: z.string().min(2, 'University is required'),
-  program: z.string().min(2, 'Program/Course is required'),
-  yearOfStudy: z.string().min(1, 'Year of study is required'),
-});
-type WorkshopData = z.infer<typeof workshopSchema>;
-
 const hackathonSchema = z.object({
   teamName: z.string().min(2, 'Team name is required'),
-  teamUniversity: z.string().min(2, 'University is required'),
-  teamSize: z.preprocess((val) => Number(val), z.number().min(1).max(5)),
+  teamSize: z.number().min(3, 'Team size must be at least 3').max(5),
   hearAboutUs: z.string().min(2, 'Please tell us how you found us'),
   leaderName: z.string().min(2, 'Leader name is required'),
   leaderEmail: z.string().email('Please enter a valid email address'),
@@ -39,18 +28,22 @@ const hackathonSchema = z.object({
   leaderProgram: z.string().min(2, 'Program/Course is required'),
   leaderYear: z.string().min(1, 'Year of study is required'),
   
-  // 1. We replace z.any() with a strict object matching the member fields!
   members: z.array(
     z.object({
       fullName: z.string().min(2, 'Name is required'),
       email: z.string().email('Please enter a valid email address'),
       contact: z.string().regex(phoneRegex, 'Invalid WhatsApp format (e.g., +60 12-345-6789)'),
-      studentId: z.string().min(2, 'Student ID is required'),
       university: z.string().min(2, 'University is required'),
       program: z.string().min(2, 'Program/Course is required'),
       year: z.string().min(1, 'Year of study is required'),
     })
-  ).optional(), 
+  ).optional(),
+  termsAccepted: z.boolean().refine((accepted) => accepted, {
+    message: 'You must agree to the Terms & Conditions',
+  }),
+  teamConsentAccepted: z.boolean().refine((accepted) => accepted, {
+    message: 'You must confirm that all listed team members have agreed',
+  }),
 });
 type HackathonData = z.infer<typeof hackathonSchema>;
 
@@ -68,21 +61,18 @@ type RegistrationResponse = {
 // If you need a new field, just add it to these arrays!
 // ==========================================
 // 1. Ensure this list exists right above the fields
-const yearOptions = ['Foundation', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Postgraduate'];
+const yearOptions = ['Foundation', 'Diploma', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Postgraduate', 'Other'];
 
-const workshopFields = [
-  { id: 'name', label: 'Full Name', type: 'text', placeholder: 'Ada Lovelace' },
-  { id: 'email', label: 'Email Address', type: 'email', placeholder: 'ada@example.com' },
-  { id: 'whatsapp', label: 'WhatsApp Friendly Number', type: 'tel', placeholder: '+60 12-345-6789' },
-  { id: 'university', label: 'University', type: 'text', placeholder: 'Swinburne University' },
-  { id: 'program', label: 'Program / Course', type: 'text', placeholder: 'Computer Science' },
-  // Changed from text to select
-  { id: 'yearOfStudy', label: 'Year of Study', type: 'select', options: yearOptions }, 
-];
+type FormField = {
+  id: string;
+  label: string;
+  type: string;
+  placeholder?: string;
+  options?: string[];
+};
 
 const hackathonTeamFields = [
   { id: 'teamName', label: 'Team Name', type: 'text', placeholder: 'e.g. The Innovators' },
-  { id: 'teamUniversity', label: 'University / Institution', type: 'text', placeholder: 'Swinburne University' },
   { id: 'hearAboutUs', label: 'How did you hear about us?', type: 'text', placeholder: 'Instagram, Friend, etc.' },
 ];
 
@@ -90,7 +80,7 @@ const hackathonLeaderFields = [
   { id: 'leaderName', label: 'Full Name', type: 'text', placeholder: 'Ada Lovelace' },
   { id: 'leaderEmail', label: 'Email Address', type: 'email', placeholder: 'ada@example.com' },
   { id: 'leaderWhatsapp', label: 'WhatsApp Friendly Number', type: 'tel', placeholder: '+60 12-345-6789' },
-  { id: 'leaderUniversity', label: 'University', type: 'text', placeholder: 'Swinburne University' },
+  { id: 'leaderUniversity', label: 'University / Institution', type: 'text', placeholder: 'Swinburne University' },
   { id: 'leaderProgram', label: 'Programme / Course', type: 'text', placeholder: 'Computer Science' },
   // Changed from text to select
   { id: 'leaderYear', label: 'Year of Study', type: 'select', options: yearOptions },
@@ -100,8 +90,7 @@ const memberFields = [
   { id: 'fullName', label: 'Full Name', type: 'text', placeholder: 'Alan Turing' },
   { id: 'email', label: 'Email Address', type: 'email', placeholder: 'alan@example.com' },
   { id: 'contact', label: 'Contact Number', type: 'tel', placeholder: '+60 12-987-6543' },
-  { id: 'studentId', label: 'Student ID', type: 'text', placeholder: '101234567' },
-  { id: 'university', label: 'University', type: 'text', placeholder: 'Swinburne University' },
+  { id: 'university', label: 'University / Institution', type: 'text', placeholder: 'Swinburne University' },
   { id: 'program', label: 'Programme / Course', type: 'text', placeholder: 'Software Engineering' },
   // Changed from text to select
   { id: 'year', label: 'Year of Study', type: 'select', options: yearOptions },
@@ -111,10 +100,9 @@ const memberFields = [
 // 3. MAIN COMPONENT
 // ==========================================
 export default function RegistrationForm() {
-  const [formType, setFormType] = useState<'hackathon' | 'workshop'>('hackathon');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({ type: 'idle', message: '' });
-  const submissionInProgress = React.useRef(false);
 
   React.useEffect(() => {
     if (submissionStatus.type === 'idle') return;
@@ -126,15 +114,21 @@ export default function RegistrationForm() {
     return () => window.clearTimeout(timeout);
   }, [submissionStatus]);
 
-  const hackathonForm = useForm<HackathonData>({ resolver: zodResolver(hackathonSchema) as any, mode: 'onChange' });
-  const workshopForm = useForm<WorkshopData>({ resolver: zodResolver(workshopSchema) as any, mode: 'onChange' });
+  const hackathonForm = useForm<HackathonData>({
+    resolver: zodResolver(hackathonSchema),
+    mode: 'onChange',
+    shouldUnregister: true,
+    defaultValues: {
+      teamSize: 3,
+      members: [],
+      termsAccepted: false,
+      teamConsentAccepted: false,
+    },
+  });
   
-  const currentTeamSize = hackathonForm.watch('teamSize');
+  const currentTeamSize = useWatch({ control: hackathonForm.control, name: 'teamSize' });
 
   const submitRegistration = async (payload: object) => {
-    if (submissionInProgress.current) return;
-
-    submissionInProgress.current = true;
     setIsSubmitting(true);
     setSubmissionStatus({ type: 'idle', message: '' });
 
@@ -163,7 +157,6 @@ export default function RegistrationForm() {
           : 'Unable to submit your registration. Please try again.',
       });
     } finally {
-      submissionInProgress.current = false;
       setIsSubmitting(false);
     }
   };
@@ -173,7 +166,6 @@ export default function RegistrationForm() {
       fullName: member.fullName,
       email: member.email,
       contact: member.contact,
-      studentId: member.studentId,
       university: member.university,
       program: member.program,
       yearOfStudy: member.year,
@@ -183,9 +175,10 @@ export default function RegistrationForm() {
       formType: 'hackathon',
       data: {
         teamName: data.teamName,
-        teamUniversity: data.teamUniversity,
         teamSize: data.teamSize,
         howDidYouHear: data.hearAboutUs,
+        termsAccepted: data.termsAccepted,
+        teamConsentAccepted: data.teamConsentAccepted,
         teamLeader: {
           fullName: data.leaderName,
           email: data.leaderEmail,
@@ -199,16 +192,10 @@ export default function RegistrationForm() {
     });
   };
 
-  const onWorkshopSubmit = async (data: WorkshopData) => {
-    await submitRegistration({ formType: 'workshop', data });
-  };
-
   // Helper component to render inputs OR dropdowns beautifully
-  const renderInput = (field: any, form: any, prefix = '') => {
-    const fieldName = prefix ? `${prefix}.${field.id}` : field.id;
-    const error = prefix 
-      ? form.formState.errors.members?.[parseInt(prefix.split('.')[1])]?.[field.id]
-      : form.formState.errors[field.id];
+  const renderInput = (field: FormField, form: UseFormReturn<HackathonData>, prefix = '') => {
+    const fieldName = (prefix ? `${prefix}.${field.id}` : field.id) as FieldPath<HackathonData>;
+    const error = get(form.formState.errors, fieldName);
 
     // THE MAGIC: These classes create the hover and focus animations!
     const inputClasses = `
@@ -229,7 +216,7 @@ export default function RegistrationForm() {
             className={`${inputClasses} appearance-none [&>option]:bg-[#030303]`}
           >
             <option value="" disabled>Select year...</option>
-            {field.options.map((opt: string) => (
+            {field.options?.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
@@ -311,31 +298,88 @@ export default function RegistrationForm() {
         </div>,
         document.body,
       )}
+      {isTermsOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsTermsOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="terms-title"
+            className="flex max-h-[75vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#090909] shadow-[0_0_40px_rgba(6,182,212,0.14)]"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
+              <h3 id="terms-title" className="text-xl font-black uppercase tracking-tight text-white sm:text-2xl">
+                Terms &amp; Conditions
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsTermsOpen(false)}
+                className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                aria-label="Close Terms & Conditions"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* TODO: Replace temporary Terms & Conditions content with final organiser-approved version. */}
+            <div className="space-y-5 overflow-y-auto px-5 py-5 text-sm leading-6 text-zinc-300 sm:px-6">
+              <section>
+                <h4 className="mb-1 font-bold text-cyan-300">1. Registration</h4>
+                <p>By submitting this registration, participants confirm that the information provided is accurate to the best of their knowledge.</p>
+              </section>
+              <section>
+                <h4 className="mb-1 font-bold text-cyan-300">2. Team Participation</h4>
+                <p>Registered team members are expected to follow the event rules and instructions provided by the organisers.</p>
+              </section>
+              <section className="space-y-3">
+                <h4 className="mb-1 font-bold text-cyan-300">3. Internal Team Disputes</h4>
+                <p>Teams are responsible for managing their own internal arrangements, responsibilities, communication, and disagreements.</p>
+                <p>The event organisers are not responsible for resolving internal team disputes, including disagreements between team members regarding roles, responsibilities, project decisions, contribution, leadership, team membership, or other internal matters.</p>
+                <p>Where possible, team members should resolve such matters among themselves.</p>
+                <p>The organisers may intervene only where an issue affects the operation, safety, rules, or integrity of the event. Any organiser decision relating to the event itself may be treated as final in accordance with the final organiser-approved Terms &amp; Conditions.</p>
+                <p className="italic text-zinc-400">This section is temporary wording and must be easy to replace later.</p>
+              </section>
+              <section>
+                <h4 className="mb-1 font-bold text-cyan-300">4. Event Changes</h4>
+                <p>The organisers may make reasonable changes to the event schedule, programme, or arrangements when necessary.</p>
+              </section>
+              <section>
+                <h4 className="mb-1 font-bold text-cyan-300">5. Participant Conduct</h4>
+                <p>Participants are expected to behave respectfully and comply with applicable event guidelines.</p>
+              </section>
+              <section>
+                <h4 className="mb-1 font-bold text-cyan-300">6. Data Usage</h4>
+                <p>Information submitted through this registration form may be used for purposes related to organising and administering the event.</p>
+              </section>
+            </div>
+
+            <div className="border-t border-white/10 px-5 py-4 sm:px-6">
+              <button
+                type="button"
+                onClick={() => setIsTermsOpen(false)}
+                className="w-full rounded-full border border-cyan-400/50 px-5 py-3 font-bold uppercase tracking-[0.15em] text-cyan-300 transition-colors hover:bg-cyan-400 hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              >
+                Close
+              </button>
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
       <Link 
         href="/" 
         className="inline-block mb-6 text-sm font-semibold text-white/50 hover:text-cyan-400 transition-colors"
       >
         ← Back to Home
       </Link>
-      <h2 className="text-3xl sm:text-4xl font-black uppercase tracking-[-0.06em] mb-8 text-center text-white">Registration</h2>
-      
-      {/* TAB SWITCHER */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-white/[0.03] p-2 rounded-2xl border border-white/10">
-        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('hackathon'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-xl font-bold uppercase tracking-[0.18em] text-[11px] transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'hackathon' ? 'bg-white text-black shadow-[0_0_20px_rgba(0,245,255,0.25)]' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
-          Hackathon Participation
-        </button>
-        <button type="button" disabled={isSubmitting} onClick={() => { setFormType('workshop'); setSubmissionStatus({ type: 'idle', message: '' }); }} className={`flex-1 py-3 px-4 rounded-xl font-bold uppercase tracking-[0.18em] text-[11px] transition-all disabled:cursor-not-allowed disabled:opacity-60 ${formType === 'workshop' ? 'bg-white text-black shadow-[0_0_20px_rgba(0,245,255,0.25)]' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
-          Workshop Participation
-        </button>
-      </div>
-
-      {/* --- THE NEW ANIMATED WRAPPER --- */}
-      {/* The key={formType} forces React to replay the animation every time the tab changes */}
-      <div key={formType} className="animate-slide-fade"></div>
+      <h2 className="text-3xl sm:text-4xl font-black uppercase tracking-[-0.06em] mb-8 text-center text-white">Hackathon Registration</h2>
 
       {/* HACKATHON FORM */}
-      {formType === 'hackathon' && (
-        <form onSubmit={hackathonForm.handleSubmit(onHackathonSubmit)} className="space-y-8 animate-in fade-in duration-300">
+      <form onSubmit={hackathonForm.handleSubmit(onHackathonSubmit)} className="space-y-8 animate-in fade-in duration-300">
           
           <div className="space-y-4">
             <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60 border-b border-white/10 pb-2">Team Information</h3>
@@ -346,9 +390,10 @@ export default function RegistrationForm() {
               {/* Dropdown needs manual handling because it's a select, not an input */}
               <div className="flex flex-col">
                 <label className="mb-1.5 text-sm text-zinc-300">Team Size</label>
-                <select {...hackathonForm.register('teamSize')} className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:border-cyan-400 focus:outline-none appearance-none [&>option]:bg-[#030303]">
-                  {[1, 2, 3, 4, 5].map(num => <option key={num} value={num}>{num} Person{num > 1 ? 's' : ' (Solo)'}</option>)}
+                <select {...hackathonForm.register('teamSize', { valueAsNumber: true })} className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:border-cyan-400 focus:outline-none appearance-none [&>option]:bg-[#030303]">
+                  {[3, 4, 5].map(num => <option key={num} value={num}>{num} Persons</option>)}
                 </select>
+                {hackathonForm.formState.errors.teamSize && <span className="text-red-400 text-xs mt-1">{hackathonForm.formState.errors.teamSize.message}</span>}
               </div>
             </div>
           </div>
@@ -380,30 +425,51 @@ export default function RegistrationForm() {
             <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
           </div>
 
+          <div className="space-y-3 border-t border-white/10 pt-6">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-400/60">Terms &amp; Conditions</h3>
+            <div className="flex items-start gap-3 text-sm leading-6 text-zinc-300">
+              <input
+                id="termsAccepted"
+                type="checkbox"
+                {...hackathonForm.register('termsAccepted')}
+                className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-cyan-400"
+              />
+              <span>
+                <label htmlFor="termsAccepted" className="cursor-pointer">I have read and agree to the </label>
+                <button
+                  type="button"
+                  onClick={() => setIsTermsOpen(true)}
+                  className="font-semibold text-cyan-300 underline decoration-cyan-400/50 underline-offset-4 transition-colors hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                >
+                  Terms &amp; Conditions
+                </button>.
+              </span>
+            </div>
+            {hackathonForm.formState.errors.termsAccepted && (
+              <p className="text-xs text-red-400">{hackathonForm.formState.errors.termsAccepted.message}</p>
+            )}
+
+            <div className="flex items-start gap-3 text-sm leading-6 text-zinc-300">
+              <input
+                id="teamConsentAccepted"
+                type="checkbox"
+                {...hackathonForm.register('teamConsentAccepted')}
+                className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-cyan-400"
+              />
+              <label htmlFor="teamConsentAccepted" className="cursor-pointer">
+                I confirm that all listed team members have agreed to participate and consented to their information being submitted.
+              </label>
+            </div>
+            {hackathonForm.formState.errors.teamConsentAccepted && (
+              <p className="text-xs text-red-400">{hackathonForm.formState.errors.teamConsentAccepted.message}</p>
+            )}
+          </div>
+
           <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:cursor-not-allowed disabled:opacity-60">
             <span className="sm:hidden">SUBMIT →</span>
             <span className="hidden sm:inline">SUBMIT HACKATHON REGISTRATION →</span>
           </button>
-        </form>
-      )}
-
-      {/* WORKSHOP FORM */}
-      {formType === 'workshop' && (
-        <form onSubmit={workshopForm.handleSubmit(onWorkshopSubmit)} className="space-y-5 animate-in fade-in duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Render workshop fields via mapping */}
-            {workshopFields.map(field => renderInput(field, workshopForm))}
-          </div>
-          <div className="flex justify-center my-4 min-h-[65px]">
-            <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
-          </div>
-          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:cursor-not-allowed disabled:opacity-60">
-            <span className="sm:hidden">SUBMIT →</span>
-            <span className="hidden sm:inline">SUBMIT WORKSHOP REGISTRATION →</span>
-          </button>
-        </form>
-      )}
-
+      </form>
     </div>
   );
 }

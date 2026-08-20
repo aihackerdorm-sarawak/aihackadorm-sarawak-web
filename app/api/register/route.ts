@@ -194,6 +194,24 @@ async function handleHackathon(data: unknown): Promise<NextResponse> {
 
   const body = data as Record<string, unknown>;
 
+  if (body.termsAccepted !== true) {
+    return errorResponse({
+      success: false,
+      error_code: "VALIDATION_ERROR",
+      message: "You must agree to the Terms & Conditions",
+      field: "termsAccepted",
+    });
+  }
+
+  if (body.teamConsentAccepted !== true) {
+    return errorResponse({
+      success: false,
+      error_code: "VALIDATION_ERROR",
+      message: "You must confirm that all listed team members have agreed to participate",
+      field: "teamConsentAccepted",
+    });
+  }
+
   const meta = validateFields(body, HACKATHON_META_FIELDS);
   if (!meta.ok) {
     return errorResponse(meta.error);

@@ -27,11 +27,13 @@ describe("registration-config", () => {
   });
 
   describe("hackathon person fields", () => {
-    it("member fields add studentId; leader fields do not include it", () => {
+    it("keeps studentId only as an optional legacy sheet column", () => {
       const memberKeys = HACKATHON_MEMBER_FIELDS.map((field) => field.key);
       const leaderKeys = HACKATHON_LEADER_FIELDS.map((field) => field.key);
+      const studentId = HACKATHON_MEMBER_FIELDS.find((field) => field.key === "studentId");
 
       expect(memberKeys).toContain("studentId");
+      expect(studentId?.required).toBe(false);
       expect(leaderKeys).not.toContain("studentId");
       expect(leaderKeys).toContain("fullName");
       expect(leaderKeys).toContain("contact");
@@ -40,6 +42,11 @@ describe("registration-config", () => {
     it("teamSize is not a required string field (it arrives as a number)", () => {
       const teamSize = HACKATHON_META_FIELDS.find((field) => field.key === "teamSize");
       expect(teamSize?.required).toBe(false);
+    });
+
+    it("keeps teamUniversity only as an optional legacy sheet column", () => {
+      const teamUniversity = HACKATHON_META_FIELDS.find((field) => field.key === "teamUniversity");
+      expect(teamUniversity?.required).toBe(false);
     });
   });
 

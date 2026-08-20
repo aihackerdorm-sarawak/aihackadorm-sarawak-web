@@ -58,24 +58,26 @@ const PERSON_BASE_FIELDS: RegistrationField[] = [
  */
 export const HACKATHON_LEADER_FIELDS: RegistrationField[] = PERSON_BASE_FIELDS;
 
-/** Team member fields — same as leader plus a required student ID. */
+/** Team member fields plus legacy storage columns retained for sheet alignment. */
 export const HACKATHON_MEMBER_FIELDS: RegistrationField[] = [
   ...PERSON_BASE_FIELDS.slice(0, 3),
-  field("studentId", "Student ID", "text"),
+  // Optional legacy column keeps historical and new sheet rows aligned.
+  { key: "studentId", label: "Student ID", type: "text", required: false, maxLength: MAX_LENGTH.text },
   ...PERSON_BASE_FIELDS.slice(3),
 ];
 
 /** Hackathon meta columns that prefix every person row in the sheet. */
 export const HACKATHON_META_FIELDS: RegistrationField[] = [
   field("teamName", "Team Name", "text"),
-  field("teamUniversity", "Team University", "text"),
+  // University is collected per person; this legacy column remains blank.
+  { key: "teamUniversity", label: "Team University", type: "text", required: false, maxLength: MAX_LENGTH.text },
   // teamSize arrives as a JSON number and is validated as an integer in the
   // route — not through the generic string sanitizer — so it's optional here.
   { key: "teamSize", label: "Team Size", type: "text", required: false, maxLength: 3 },
   { key: "howDidYouHear", label: "How did you hear about us?", type: "text", required: false, maxLength: MAX_LENGTH.text },
 ];
 
-export const TEAM_SIZE_MIN = 1;
+export const TEAM_SIZE_MIN = 3;
 export const TEAM_SIZE_MAX = 5;
 
 export const FORMS: Record<
