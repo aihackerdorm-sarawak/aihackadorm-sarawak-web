@@ -677,38 +677,38 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
         </div>
 
         <div className="lg:max-w-[30rem] space-y-4">
-          <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-18 backdrop-blur-md">
-            <p className="font-mono text-[9px] uppercase tracking-[0.32em] text-white/40">
+          <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-md">
+            <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
               Organised by
             </p>
-            <div className="mt-3 flex items-center justify-between gap-4">
-              <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+            <div className="mt-4 flex items-center gap-6">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
                 <Image
                   src="/hackerdorm.jpg"
                   alt="AI Hackerdorm"
                   fill
-                  sizes="112px"
-                  className="object-contain p-2.5"
+                  sizes="96px"
+                  className="object-contain p-2"
                 />
               </div>
 
               <div className="flex items-center gap-1">
-                <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-x1 border border-white/10 bg-black/40">
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   <Image
                     src="/comp_science_club.png"
                     alt="Swinburne CompSci"
                     fill
-                    sizes="112px"
-                    className="object-contain p-2.5"
+                    sizes="96px"
+                    className="object-contain p-2"
                   />
                 </div>
-                <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   <Image
                     src="/swinburne.jpeg"
                     alt="Swinburne Sarawak"
                     fill
-                    sizes="112px"
-                    className="object-contain p-2"
+                    sizes="96px"
+                    className="object-contain p-1.5"
                   />
                 </div>
               </div>
