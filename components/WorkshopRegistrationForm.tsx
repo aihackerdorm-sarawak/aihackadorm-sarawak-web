@@ -55,6 +55,7 @@ export default function WorkshopRegistrationForm({ workshopId, title, descriptio
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState({ type: 'idle', message: '' });
+  const [captchaError, setCaptchaError] = useState(false);
 
   useEffect(() => {
     if (submissionStatus.type === 'idle') return;
@@ -143,11 +144,28 @@ export default function WorkshopRegistrationForm({ workshopId, title, descriptio
             </div>
           </div>
 
-          <div className="flex justify-center my-4 min-h-[65px]">
+          <div className="flex flex-col items-center justify-center my-4 min-h-[85px]">
             <Turnstile 
               siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} 
-              onSuccess={(token) => setTurnstileToken(token)} 
+              onSuccess={(token) => {
+                setTurnstileToken(token);
+                setCaptchaError(false);
+              }} 
+              onError={() => {
+                setTurnstileToken(null);
+                setCaptchaError(true);
+              }}
+              onExpire={() => {
+                setTurnstileToken(null);
+                setCaptchaError(true);
+              }}
             />
+            {/* Show the error message if verification fails */}
+            {captchaError && (
+              <p className="text-red-400 text-sm mt-2 font-bold animate-in fade-in">
+                Verification Unsuccessful
+              </p>
+            )}
           </div>
 
           <div className="space-y-3 border-t border-white/10 pt-6">
@@ -166,7 +184,9 @@ export default function WorkshopRegistrationForm({ workshopId, title, descriptio
             disabled={isSubmitting || !turnstileToken} 
             className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {!turnstileToken ? 'PLEASE WAIT FOR VERIFICATION' : 'SUBMIT REGISTRATION →'}
+            {!turnstileToken 
+              ? (captchaError ? 'VERIFICATION UNSUCCESSFUL' : 'PLEASE WAIT FOR VERIFICATION') 
+              : 'SUBMIT REGISTRATION →'}
           </button>
       </form>
       {/* --- SUCCESS POPUP MODAL --- */}
