@@ -77,7 +77,7 @@ const scheduleItems: ScheduleItem[] = [
       "A tentative warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
     badge: "Tentative",
     // Placeholder — point to the live workshop registration page when it exists.
-    registerHref: "/register?form=workshop",
+    registerHref: "/workshop-1",
   },
   {
     id: "workshop-2",
@@ -89,7 +89,7 @@ const scheduleItems: ScheduleItem[] = [
       "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
     badge: "Tentative",
     // Placeholder — point to the live workshop registration page when it exists.
-    registerHref: "/register?form=workshop",
+    registerHref: "/workshop-2",
   },
   {
     id: "main-event",
