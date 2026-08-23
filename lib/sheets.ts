@@ -58,7 +58,13 @@ export function getTabName(formType: RegistrationFormType): string {
   if (formType === "hackathon") {
     return process.env.GOOGLE_HACKATHON_TAB ?? "Hackathon";
   }
-  return process.env.GOOGLE_WORKSHOP_TAB ?? "Workshop";
+  
+  if (formType === "workshop") {
+    return process.env.GOOGLE_WORKSHOP_TAB ?? "Workshop";
+  }
+
+  // If it is Workshop 1 or Workshop 2, use exactly that name!
+  return formType;
 }
 
 /**

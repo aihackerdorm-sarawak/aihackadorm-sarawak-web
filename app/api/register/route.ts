@@ -176,7 +176,14 @@ async function handleWorkshop(data: unknown): Promise<NextResponse> {
   }
 
   const rows = flattenWorkshop(validated.values);
-  const updatedRange = await appendRows("workshop", rows);
+// 1. Grab the workshop ID 
+const submittedWorkshopId = String(validated.values.yearOfStudy);
+
+// 2. Make it bulletproof by checking if it contains the number 1
+const sheetTabName = submittedWorkshopId.includes("1") ? "Workshop 1" : "Workshop 2";
+
+// 3. Send the data to the correct tab
+const updatedRange = await appendRows(sheetTabName, rows);
 
   return NextResponse.json<ApiSuccess>({
     success: true,
@@ -310,6 +317,37 @@ export async function POST(request: Request) {
     return errorResponse({ success: false, error_code: "VALIDATION_ERROR", message: "Invalid payload shape" });
   }
 
+  // --- START CLOUDFLARE SECURITY CHECK ---
+  const turnstileToken = (body as Record<string, unknown>).turnstileToken as string | undefined;
+
+  if (!turnstileToken) {
+    return errorResponse({
+      success: false,
+      error_code: "VALIDATION_ERROR",
+      message: "Security verification missing. Please complete the CAPTCHA."
+    }, 400);
+  }
+
+  const verifyResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      secret: process.env.TURNSTILE_SECRET_KEY,
+      response: turnstileToken,
+    }),
+  });
+
+  const verifyResult = await verifyResponse.json();
+
+  if (!verifyResult.success) {
+    return errorResponse({
+      success: false,
+      error_code: "FORBIDDEN",
+      message: "Security verification failed."
+    }, 403);
+  }
+  // --- END CLOUDFLARE SECURITY CHECK ---
+  
   const formType = (body as Record<string, unknown>).formType;
   if (formType !== "workshop" && formType !== "hackathon") {
     return errorResponse({
