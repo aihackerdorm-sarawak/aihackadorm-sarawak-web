@@ -8,7 +8,7 @@
  * change here, no route logic to touch.
  */
 
-export type RegistrationFormType = "workshop" | "hackathon";
+export type RegistrationFormType = "workshop" | "hackathon" | "Workshop 1" | "Workshop 2";
 
 export type FieldType = "text" | "email" | "tel";
 
@@ -91,6 +91,14 @@ export const FORMS: Record<
     tabName: "Workshop",
     description: "Single-person workshop participation",
   },
+  "Workshop 1": {
+    tabName: "Workshop 1",
+    description: "Participation for Workshop 1"
+  },
+  "Workshop 2": {
+    tabName: "Workshop 2",
+    description: "Participation for Workshop 2"
+  },
   hackathon: {
     tabName: "Hackathon",
     description: "Team registration with leader + optional members",
@@ -117,5 +125,5 @@ export function hackathonHeaderRow(): string[] {
 }
 
 export function headerRowFor(formType: RegistrationFormType): string[] {
-  return formType === "workshop" ? workshopHeaderRow() : hackathonHeaderRow();
+  return formType === "hackathon" ? hackathonHeaderRow() : workshopHeaderRow();
 }

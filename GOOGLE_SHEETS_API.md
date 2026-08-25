@@ -130,6 +130,8 @@ configured forms — useful as a connection smoke test while there's no form UI.
 | `GOOGLE_PRIVATE_KEY` | yes | `private_key` — keep the surrounding double quotes; code converts `\n` escapes |
 | `GOOGLE_HACKATHON_TAB` | no | default `Hackathon` |
 | `GOOGLE_WORKSHOP_TAB` | no | default `Workshop` |
+| `GOOGLE_WORKSHOP_1_TAB` | no | default `Workshop 1` |
+| `GOOGLE_WORKSHOP_2_TAB` | no | default `Workshop 2` |
 
 ## Verified in testing (2026-08-09)
 

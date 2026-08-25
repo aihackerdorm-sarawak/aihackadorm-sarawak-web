@@ -39,13 +39,13 @@ type ScheduleItem = {
   id: string;
   label: string;
   date: string;
+  eventStartsAt?: string;
   hint: string;
   title: string;
   copy: string;
   badge?: string;
   status?: string;
-  /** Where the milestone's register CTA points. Placeholder until the
-      workshop registration pages are live. */
+  /** Where the milestone's register CTA points. */
   registerHref?: string;
 };
 
@@ -76,8 +76,9 @@ const scheduleItems: ScheduleItem[] = [
     copy:
       "A tentative warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
     badge: "Tentative",
+    eventStartsAt: "2026-09-10T00:00:00+08:00",
     // Placeholder — point to the live workshop registration page when it exists.
-    registerHref: "/register?form=workshop",
+    registerHref: "/workshop-1",
   },
   {
     id: "workshop-2",
@@ -88,8 +89,9 @@ const scheduleItems: ScheduleItem[] = [
     copy:
       "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
     badge: "Tentative",
+    eventStartsAt: "2026-10-05T00:00:00+08:00",
     // Placeholder — point to the live workshop registration page when it exists.
-    registerHref: "/register?form=workshop",
+    registerHref: "/workshop-2",
   },
   {
     id: "main-event",
@@ -107,6 +109,34 @@ const scheduleItems: ScheduleItem[] = [
 // this point on the timeline when clicked.
 const FIRST_WORKSHOP_ID =
   scheduleItems.find((item) => item.id.startsWith("workshop"))?.id ?? "workshop";
+
+const WORKSHOP_REGISTRATION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getWorkshopRegistrationState(item: ScheduleItem, now: number) {
+  if (!item.registerHref || !item.eventStartsAt) {
+    return { status: "unavailable" as const };
+  }
+
+  const eventStartsAt = new Date(item.eventStartsAt).getTime();
+  const registrationOpensAt = eventStartsAt - WORKSHOP_REGISTRATION_WINDOW_MS;
+
+  if (now < registrationOpensAt) {
+    const opensAt = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "Asia/Kuala_Lumpur",
+    }).format(registrationOpensAt);
+
+    return { status: "upcoming" as const, opensAt };
+  }
+
+  if (now < eventStartsAt) {
+    return { status: "open" as const, href: item.registerHref };
+  }
+
+  return { status: "closed" as const };
+}
 
 const benefitCards = ["To Be Announced", "To Be Announced", "To Be Announced"];
 
@@ -165,6 +195,7 @@ function useCountdownState() {
   };
 
   return {
+    now,
     stage,
     parts,
     values,
@@ -708,7 +739,7 @@ function HeroSection({
             <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
               Organised by
             </p>
-            <div className="mt-4 flex items-center gap-6">
+            <div className="mt-4 flex items-center gap-2">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
                 <Image
                   src="/AI-Hackadorm-Nav.jpg"
@@ -794,15 +825,18 @@ function SponsorsSection() {
 function ScheduleSection({
   selectedId,
   onSelect,
+  now,
 }: {
   selectedId: string;
   onSelect: (id: string) => void;
+  now: number;
 }) {
   const selectedIndex = Math.max(
     0,
     scheduleItems.findIndex((item) => item.id === selectedId),
   );
   const selected = scheduleItems[selectedIndex] ?? scheduleItems[0];
+  const registrationState = getWorkshopRegistrationState(selected, now);
   const milestoneRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -931,14 +965,22 @@ function ScheduleSection({
               {selectedIndex + 1} / {scheduleItems.length}
             </p>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
-            {selected.registerHref ? (
+            {registrationState.status === "open" ? (
               <a
-                href={selected.registerHref}
+                href={registrationState.href}
                 className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-colors hover:bg-cyan-400"
               >
                 Register for this workshop
                 <ArrowRight className="h-3.5 w-3.5" />
               </a>
+            ) : registrationState.status === "upcoming" ? (
+              <div className="mt-5 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">
+                Registration starts {registrationState.opensAt}
+              </div>
+            ) : registrationState.status === "closed" ? (
+              <div className="mt-5 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
+                Registration closed
+              </div>
             ) : null}
             <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.28em] text-white/32">
               <span>{selected.date}</span>
@@ -1203,9 +1245,11 @@ function PartnerSocialSection() {
 function WaveZone({
   selectedMilestoneId,
   onSelectMilestone,
+  now,
 }: {
   selectedMilestoneId: string;
   onSelectMilestone: (id: string) => void;
+  now: number;
 }) {
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLDivElement>();
@@ -1228,7 +1272,11 @@ function WaveZone({
 
       <div className="relative z-10 mx-auto w-full max-w-7xl space-y-6">
         <SponsorsSection />
-        <ScheduleSection selectedId={selectedMilestoneId} onSelect={onSelectMilestone} />
+        <ScheduleSection
+          selectedId={selectedMilestoneId}
+          onSelect={onSelectMilestone}
+          now={now}
+        />
         <BenefitsSection />
         <FaqSection />
         <CollaboratorsSection />
@@ -1261,6 +1309,7 @@ function LandingContent() {
         <WaveZone
           selectedMilestoneId={selectedMilestoneId}
           onSelectMilestone={setSelectedMilestoneId}
+          now={countdown.now}
         />
         <SiteFooter />
       </div>

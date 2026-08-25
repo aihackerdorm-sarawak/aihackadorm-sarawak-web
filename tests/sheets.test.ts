@@ -40,6 +40,8 @@ function setEnv(overrides: Record<string, string> = {}) {
   process.env.GOOGLE_PRIVATE_KEY = '"-----BEGIN PRIVATE KEY-----\\nabc\\ndef\\n-----END PRIVATE KEY-----\\n"';
   process.env.GOOGLE_HACKATHON_TAB = "Hackathon";
   process.env.GOOGLE_WORKSHOP_TAB = "Workshop";
+  process.env.GOOGLE_WORKSHOP_1_TAB = "Workshop 1";
+  process.env.GOOGLE_WORKSHOP_2_TAB = "Workshop 2";
   for (const [key, value] of Object.entries(overrides)) {
     process.env[key] = value;
   }
@@ -51,6 +53,8 @@ function clearEnv() {
   delete process.env.GOOGLE_PRIVATE_KEY;
   delete process.env.GOOGLE_HACKATHON_TAB;
   delete process.env.GOOGLE_WORKSHOP_TAB;
+  delete process.env.GOOGLE_WORKSHOP_1_TAB;
+  delete process.env.GOOGLE_WORKSHOP_2_TAB;
 }
 
 const mockedSheets = sheets as jest.Mock;
@@ -76,12 +80,21 @@ describe("getSheetsEnv", () => {
 describe("getTabName", () => {
   it("uses the default tab names", () => {
     expect(getTabName("workshop")).toBe("Workshop");
+    expect(getTabName("Workshop 1")).toBe("Workshop 1");
+    expect(getTabName("Workshop 2")).toBe("Workshop 2");
     expect(getTabName("hackathon")).toBe("Hackathon");
   });
 
   it("honors env-var overrides", () => {
-    setEnv({ GOOGLE_WORKSHOP_TAB: "WS", GOOGLE_HACKATHON_TAB: "HK" });
+    setEnv({
+      GOOGLE_WORKSHOP_TAB: "WS",
+      GOOGLE_WORKSHOP_1_TAB: "WS One",
+      GOOGLE_WORKSHOP_2_TAB: "WS Two",
+      GOOGLE_HACKATHON_TAB: "HK",
+    });
     expect(getTabName("workshop")).toBe("WS");
+    expect(getTabName("Workshop 1")).toBe("WS One");
+    expect(getTabName("Workshop 2")).toBe("WS Two");
     expect(getTabName("hackathon")).toBe("HK");
   });
 });
@@ -137,7 +150,7 @@ describe("ensureTabWithHeaders", () => {
     );
     expect(mockValuesApi.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        range: "Workshop!A1:G1",
+        range: "'Workshop'!A1:G1",
         valueInputOption: "RAW",
         requestBody: { values: [WORKSHOP_HEADERS] },
       })
@@ -163,6 +176,22 @@ describe("ensureTabWithHeaders", () => {
     expect(mockSpreadsheetsApi.batchUpdate).not.toHaveBeenCalled();
     expect(mockValuesApi.update).not.toHaveBeenCalled();
   });
+
+  it("uses workshop headers for both numbered workshop tabs", async () => {
+    mockSpreadsheetsApi.get.mockResolvedValue({
+      data: { sheets: [{ properties: { title: "Workshop 1" } }] },
+    });
+    mockSpreadsheetsApi.values.get.mockResolvedValue({ data: {} });
+
+    await ensureTabWithHeaders("Workshop 1");
+
+    expect(mockValuesApi.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        range: "'Workshop 1'!A1:G1",
+        requestBody: { values: [WORKSHOP_HEADERS] },
+      })
+    );
+  });
 });
 
 describe("appendRows", () => {
@@ -178,7 +207,7 @@ describe("appendRows", () => {
 
     expect(mockValuesApi.append).toHaveBeenCalledWith(
       expect.objectContaining({
-        range: "Workshop!A2:G",
+        range: "'Workshop'!A2:G",
         valueInputOption: "RAW",
         requestBody: {
           values: [["2026-08-09 10:00:00", "A", "a@b.com", "+60 12-345-6789", "U", "P", "Y"]],
@@ -211,7 +240,24 @@ describe("appendRows", () => {
     await appendRows("hackathon", [row, row]);
 
     expect(mockValuesApi.append).toHaveBeenCalledWith(
-      expect.objectContaining({ range: "Hackathon!A2:M" })
+      expect.objectContaining({ range: "'Hackathon'!A2:M" })
+    );
+  });
+
+  it("uses the workshop tab width for numbered workshop rows", async () => {
+    mockSpreadsheetsApi.get.mockResolvedValue({
+      data: { sheets: [{ properties: { title: "Workshop 2" } }] },
+    });
+    mockSpreadsheetsApi.values.get.mockResolvedValue({ data: { values: [WORKSHOP_HEADERS] } });
+    mockValuesApi.append.mockResolvedValue({
+      data: { updates: { updatedRange: "'Workshop 2'!A2:G2" } },
+    });
+
+    const row = Array.from({ length: 7 }, (_, i) => `cell${i}`);
+    await appendRows("Workshop 2", [row]);
+
+    expect(mockValuesApi.append).toHaveBeenCalledWith(
+      expect.objectContaining({ range: "'Workshop 2'!A2:G" })
     );
   });
 });

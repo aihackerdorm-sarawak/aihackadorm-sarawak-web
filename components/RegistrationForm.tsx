@@ -158,8 +158,14 @@ export default function RegistrationForm() {
       });
     } finally {
       setIsSubmitting(false);
+      setTurnstileToken(null);
+      setWidgetKey(prev => prev + 1);
     }
   };
+
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState(false);
+  const [widgetKey, setWidgetKey] = useState(0);
 
   const onHackathonSubmit = async (data: HackathonData) => {
     const teamMembers = (data.members ?? []).slice(0, data.teamSize - 1).map((member) => ({
@@ -173,6 +179,7 @@ export default function RegistrationForm() {
 
     await submitRegistration({
       formType: 'hackathon',
+      turnstileToken: turnstileToken,
       data: {
         teamName: data.teamName,
         teamSize: data.teamSize,
@@ -421,8 +428,30 @@ export default function RegistrationForm() {
             </div>
           )}
 
-          <div className="flex justify-center my-4 min-h-[65px]">
-            <Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} />
+          {/* UPDATED TURNSTILE BLOCK */}
+          <div className="flex flex-col items-center justify-center my-4 min-h-[85px]">
+            <Turnstile 
+              key={widgetKey} //
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''} 
+              onSuccess={(token) => {
+                setTurnstileToken(token);
+                setCaptchaError(false);
+              }} 
+              onError={() => {
+                setTurnstileToken(null);
+                setCaptchaError(true);
+              }}
+              onExpire={() => {
+                setTurnstileToken(null);
+                setCaptchaError(true);
+              }}
+            />
+            {/* Show the error message if verification fails */}
+            {captchaError && (
+              <p className="text-red-400 text-sm mt-2 font-bold animate-in fade-in">
+                Verification Unsuccessful
+              </p>
+            )}
           </div>
 
           <div className="space-y-3 border-t border-white/10 pt-6">
@@ -465,10 +494,17 @@ export default function RegistrationForm() {
             )}
           </div>
 
-          <button type="submit" disabled={isSubmitting} className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:cursor-not-allowed disabled:opacity-60">
-            <span className="sm:hidden">SUBMIT →</span>
-            <span className="hidden sm:inline">SUBMIT HACKATHON REGISTRATION →</span>
+          {/* Your new updated button is right here */}
+          <button 
+            type="submit" 
+            disabled={isSubmitting || !turnstileToken} 
+            className="w-full bg-white text-black font-bold py-3 px-4 rounded-full hover:bg-cyan-400 transition-colors mt-6 text-base sm:py-4 sm:text-lg disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {!turnstileToken 
+              ? (captchaError ? 'VERIFICATION UNSUCCESSFUL' : 'PLEASE WAIT FOR VERIFICATION') 
+              : <><span className="sm:hidden">SUBMIT →</span><span className="hidden sm:inline">SUBMIT HACKATHON REGISTRATION →</span></>}
           </button>
+
       </form>
     </div>
   );

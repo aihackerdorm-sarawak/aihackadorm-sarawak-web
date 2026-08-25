@@ -55,10 +55,21 @@ export function getSheetsClient(): sheets_v4.Sheets {
 }
 
 export function getTabName(formType: RegistrationFormType): string {
-  if (formType === "hackathon") {
-    return process.env.GOOGLE_HACKATHON_TAB ?? "Hackathon";
+  switch (formType) {
+    case "hackathon":
+      return process.env.GOOGLE_HACKATHON_TAB ?? "Hackathon";
+    case "workshop":
+      return process.env.GOOGLE_WORKSHOP_TAB ?? "Workshop";
+    case "Workshop 1":
+      return process.env.GOOGLE_WORKSHOP_1_TAB ?? "Workshop 1";
+    case "Workshop 2":
+      return process.env.GOOGLE_WORKSHOP_2_TAB ?? "Workshop 2";
   }
-  return process.env.GOOGLE_WORKSHOP_TAB ?? "Workshop";
+}
+
+/** Quotes a sheet title for use in A1 notation, including embedded apostrophes. */
+function a1SheetName(tabName: string): string {
+  return `'${tabName.replace(/'/g, "''")}'`;
 }
 
 /**
@@ -89,7 +100,7 @@ export async function ensureTabWithHeaders(formType: RegistrationFormType): Prom
   }
 
   const headers = headerRowFor(formType);
-  const range = `${tabName}!A1:${columnLetter(headers.length)}1`;
+  const range = `${a1SheetName(tabName)}!A1:${columnLetter(headers.length)}1`;
 
   const current = await sheets.spreadsheets.values.get({
     spreadsheetId: env.sheetId,
@@ -132,7 +143,7 @@ export async function appendRows(
 
   const response = await sheets.spreadsheets.values.append({
     spreadsheetId: env.sheetId,
-    range: `${tabName}!A2:${startColumn}`,
+    range: `${a1SheetName(tabName)}!A2:${startColumn}`,
     // RAW (not USER_ENTERED): phone numbers like "+60 12-345-6789" start with
     // '+' which USER_ENTERED parses as a formula — every contact column ended
     // up as #ERROR! until this was switched to RAW.
@@ -140,7 +151,7 @@ export async function appendRows(
     requestBody: { values: rows },
   });
 
-  return response.data.updates?.updatedRange ?? `${tabName}!A2:${startColumn}`;
+  return response.data.updates?.updatedRange ?? `${a1SheetName(tabName)}!A2:${startColumn}`;
 }
 
 /** 1 -> A, 2 -> B, ... 26 -> Z, 27 -> AA. */
