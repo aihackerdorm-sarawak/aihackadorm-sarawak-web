@@ -120,6 +120,68 @@ export default function WorkshopRegistrationForm({ workshopId, title, descriptio
 
   return (
     <div className="p-6 sm:p-8 bg-white/[0.045] backdrop-blur-md border border-white/10 rounded-[30px] max-w-3xl w-full mx-auto text-white shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      {(isSubmitting || submissionStatus.type !== 'idle') && createPortal(
+        <div
+          role={submissionStatus.type === 'error' ? 'alert' : 'status'}
+          aria-live={submissionStatus.type === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
+          className="fixed inset-x-4 top-5 z-[100] flex justify-center pointer-events-none sm:top-7"
+        >
+          <div
+            className={`pointer-events-auto flex w-full max-w-md items-center gap-3 overflow-hidden rounded-xl border bg-zinc-950/95 px-4 py-3.5 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-3 duration-300 ${
+              isSubmitting
+                ? 'border-cyan-400/50 shadow-cyan-500/20'
+                : submissionStatus.type === 'success'
+                  ? 'border-emerald-400/50 shadow-emerald-500/20'
+                  : 'border-red-400/50 shadow-red-500/20'
+            }`}
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                isSubmitting
+                  ? 'bg-cyan-400/10 text-cyan-300'
+                  : submissionStatus.type === 'success'
+                    ? 'bg-emerald-400/10 text-emerald-300'
+                    : 'bg-red-400/10 text-red-300'
+              }`}
+              aria-hidden="true"
+            >
+              {isSubmitting ? (
+                <LoaderCircle className="h-5 w-5 animate-spin" />
+              ) : submissionStatus.type === 'success' ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <AlertCircle className="h-5 w-5" />
+              )}
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold tracking-wide text-white">
+                {isSubmitting
+                  ? 'Submitting registration'
+                  : submissionStatus.type === 'success'
+                    ? 'Registration received'
+                    : 'Submission unsuccessful'}
+              </p>
+              <p className="mt-0.5 text-sm leading-5 text-zinc-300">
+                {isSubmitting ? 'Please wait while we secure your spot...' : submissionStatus.message}
+              </p>
+            </div>
+
+            {!isSubmitting && (
+              <button
+                type="button"
+                onClick={() => setSubmissionStatus({ type: 'idle', message: '' })}
+                className="shrink-0 rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                aria-label="Dismiss notification"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
       <Link href="/" className="inline-block mb-6 text-sm font-semibold text-white/50 hover:text-cyan-400 transition-colors">← Back to Home</Link>
       
       <h2 className="text-3xl sm:text-4xl font-black uppercase tracking-[-0.06em] mb-4 text-center text-white">Workshop Registration</h2>
@@ -189,28 +251,6 @@ export default function WorkshopRegistrationForm({ workshopId, title, descriptio
               : 'SUBMIT REGISTRATION →'}
           </button>
       </form>
-      {/* --- SUCCESS POPUP MODAL --- */}
-      {submissionStatus.type === 'success' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-zinc-900 border border-cyan-400/50 p-8 rounded-[30px] max-w-sm w-full text-center shadow-2xl animate-in fade-in zoom-in-95 duration-300">
-            <CheckCircle2 className="w-24 h-24 text-cyan-400 mx-auto mb-6" />
-            <h3 className="text-2xl font-black text-white mb-3 uppercase tracking-wide">
-              Success!
-            </h3>
-            <p className="text-zinc-400 mb-8 leading-relaxed">
-              {submissionStatus.message || "Your registration has been successfully recorded. We will see you there!"}
-            </p>
-            <button 
-              onClick={() => window.location.href = '/'} 
-              className="w-full bg-cyan-400 text-black font-bold py-3 px-4 rounded-full hover:bg-white transition-colors mt-2"
-            >
-              BACK TO HOME
-            </button>
-          </div>
-        </div>
-      )}
-      {/* --- END SUCCESS POPUP MODAL --- */}
-
     </div>
   );
 }
