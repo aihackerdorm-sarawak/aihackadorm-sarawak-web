@@ -739,7 +739,7 @@ function HeroSection({
             <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-cyan-400/60">
               Organised by
             </p>
-            <div className="mt-4 flex items-center gap-6">
+            <div className="mt-4 flex items-center gap-2">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
                 <Image
                   src="/AI-Hackadorm-Nav.jpg"
