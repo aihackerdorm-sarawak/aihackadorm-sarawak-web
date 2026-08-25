@@ -26,6 +26,7 @@ const TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 const validWorkshop = {
   formType: "workshop",
+  turnstileToken: "test-turnstile-token",
   data: {
     name: "Ada Lovelace",
     email: "ada@example.com",
@@ -38,6 +39,7 @@ const validWorkshop = {
 
 const validHackathon = {
   formType: "hackathon",
+  turnstileToken: "test-turnstile-token",
   data: {
     teamName: "The Innovators",
     teamSize: 3,
@@ -90,6 +92,9 @@ async function postJson(body: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  global.fetch = jest.fn().mockResolvedValue({
+    json: jest.fn().mockResolvedValue({ success: true }),
+  }) as jest.Mock;
   mockedAppendRows.mockResolvedValue("Workshop!A2:G2");
 });
 
@@ -99,6 +104,7 @@ describe("POST /api/register — workshop", () => {
 
     expect(status).toBe(200);
     expect(body).toMatchObject({ success: true, formType: "workshop", rowsAppended: 1 });
+    expect(mockedAppendRows).toHaveBeenCalledWith("Workshop 2", expect.any(Array));
 
     const row = mockedAppendRows.mock.calls[0][1][0];
     expect(row).toHaveLength(7);
@@ -169,6 +175,15 @@ describe("POST /api/register — workshop", () => {
 
     const row = mockedAppendRows.mock.calls[0][1][0];
     expect(row[1]).toHaveLength(200);
+  });
+
+  it("routes Workshop 1 registrations to the first numbered tab", async () => {
+    await postJson({
+      ...validWorkshop,
+      data: { ...validWorkshop.data, yearOfStudy: "workshop1" },
+    });
+
+    expect(mockedAppendRows).toHaveBeenCalledWith("Workshop 1", expect.any(Array));
   });
 });
 
@@ -303,7 +318,11 @@ describe("POST /api/register — hackathon", () => {
 
 describe("POST /api/register — envelope", () => {
   it("rejects an unknown formType", async () => {
-    const { status, body } = await postJson({ formType: "sponsor", data: {} });
+    const { status, body } = await postJson({
+      formType: "sponsor",
+      turnstileToken: "test-turnstile-token",
+      data: {},
+    });
 
     expect(status).toBe(400);
     expect(body).toMatchObject({ field: "formType" });
@@ -337,9 +356,11 @@ describe("GET /api/register — smoke test", () => {
   it("reports spreadsheet details and configured forms", async () => {
     mockedGetSheetsEnv.mockReturnValue({ sheetId: "abc123" });
     mockedEnsureTabWithHeaders.mockResolvedValue(undefined);
-    mockedGetTabName.mockImplementation((type: string) =>
-      type === "hackathon" ? "Hackathon" : "Workshop"
-    );
+    mockedGetTabName.mockImplementation((type: string) => {
+      if (type === "workshop") return "Workshop";
+      if (type === "hackathon") return "Hackathon";
+      return type;
+    });
     mockedGetSheetsClient.mockReturnValue({
       spreadsheets: {
         get: jest.fn().mockResolvedValue({
@@ -365,9 +386,17 @@ describe("GET /api/register — smoke test", () => {
       spreadsheetTitle: "Test Spreadsheet",
       forms: [
         { formType: "workshop", tabName: "Workshop" },
+        { formType: "Workshop 1", tabName: "Workshop 1" },
+        { formType: "Workshop 2", tabName: "Workshop 2" },
         { formType: "hackathon", tabName: "Hackathon" },
       ],
     });
+    expect(mockedEnsureTabWithHeaders.mock.calls.map(([formType]) => formType)).toEqual([
+      "workshop",
+      "Workshop 1",
+      "Workshop 2",
+      "hackathon",
+    ]);
   });
 
   it("returns 500 when credentials or the connection are broken", async () => {

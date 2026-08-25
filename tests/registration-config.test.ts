@@ -5,6 +5,7 @@ import {
   HACKATHON_META_FIELDS,
   WORKSHOP_FIELDS,
   hackathonHeaderRow,
+  headerRowFor,
   workshopHeaderRow,
 } from "@/lib/registration-config";
 
@@ -78,11 +79,23 @@ describe("registration-config", () => {
         HACKATHON_META_FIELDS.map((field) => field.label)
       );
     });
+
+    it("uses workshop headers for both numbered workshop forms", () => {
+      expect(headerRowFor("Workshop 1")).toEqual(workshopHeaderRow());
+      expect(headerRowFor("Workshop 2")).toEqual(workshopHeaderRow());
+    });
   });
 
-  it("registers both form types", () => {
-    expect(Object.keys(FORMS).sort()).toEqual(["hackathon", "workshop"]);
+  it("registers all form types", () => {
+    expect(Object.keys(FORMS).sort()).toEqual([
+      "Workshop 1",
+      "Workshop 2",
+      "hackathon",
+      "workshop",
+    ]);
     expect(FORMS.workshop.tabName).toBe("Workshop");
+    expect(FORMS["Workshop 1"].tabName).toBe("Workshop 1");
+    expect(FORMS["Workshop 2"].tabName).toBe("Workshop 2");
     expect(FORMS.hackathon.tabName).toBe("Hackathon");
   });
 });

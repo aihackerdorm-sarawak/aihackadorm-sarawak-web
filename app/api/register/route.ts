@@ -387,7 +387,11 @@ export async function GET() {
     const sheets = getSheetsClient();
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: env.sheetId });
 
-    await Promise.all([ensureTabWithHeaders("workshop"), ensureTabWithHeaders("hackathon")]);
+    await Promise.all(
+      (Object.keys(FORMS) as RegistrationFormType[]).map((formType) =>
+        ensureTabWithHeaders(formType)
+      )
+    );
 
     const refreshed = await sheets.spreadsheets.get({ spreadsheetId: env.sheetId });
 

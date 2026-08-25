@@ -125,5 +125,5 @@ export function hackathonHeaderRow(): string[] {
 }
 
 export function headerRowFor(formType: RegistrationFormType): string[] {
-  return formType === "workshop" ? workshopHeaderRow() : hackathonHeaderRow();
+  return formType === "hackathon" ? hackathonHeaderRow() : workshopHeaderRow();
 }
