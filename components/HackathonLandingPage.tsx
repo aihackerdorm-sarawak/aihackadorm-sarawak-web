@@ -60,7 +60,7 @@ const scheduleItems: ScheduleItem[] = [
   {
     id: "registration",
     label: "Registration Opens",
-    date: "Sep 1, 2026",
+    date: "Sep 15, 2026",
     hint: "Launch milestone",
     title: "Registration opens",
     copy:
@@ -70,13 +70,13 @@ const scheduleItems: ScheduleItem[] = [
   {
     id: "workshop",
     label: "Pre-Hackathon Workshop 1",
-    date: "Sep 10, 2026",
+    date: "Sep 25, 2026",
     hint: "Warm-up session",
     title: "Pre-hackathon workshop 1",
     copy:
       "A tentative warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
     badge: "Tentative",
-    eventStartsAt: "2026-09-10T00:00:00+08:00",
+    eventStartsAt: "2026-09-25T00:00:00+08:00",
     // Placeholder — point to the live workshop registration page when it exists.
     registerHref: "/workshop-1",
   },

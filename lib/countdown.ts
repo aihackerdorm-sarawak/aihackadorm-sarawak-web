@@ -22,8 +22,8 @@ export type CountdownStage = {
 };
 
 export const COUNTDOWN_TARGETS = {
-  registration: new Date("2026-09-01T00:00:00"),
-  workshop: new Date("2026-09-10T00:00:00"),
+  registration: new Date("2026-09-15T00:00:00"),
+  workshop: new Date("2026-09-25T00:00:00"),
   mainEvent: new Date("2026-10-09T00:00:00"),
   eventEnds: new Date("2026-10-12T00:00:00"),
 } as const;
