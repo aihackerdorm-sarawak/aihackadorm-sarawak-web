@@ -6,7 +6,7 @@ import { GraphicsModeProvider } from '../../components/GraphicsMode';
 import { redirect } from "next/navigation";
 
 export default function Workshop1Page() {
-  const registrationStartDate = new Date("2026-09-01T12:00:00+08:00");
+  const registrationStartDate = new Date("2026-09-18T00:00:00+08:00");
   const currentDate = new Date();
 
   // Teleport the user to the main page if they are early
@@ -23,7 +23,7 @@ export default function Workshop1Page() {
             workshopId="workshop1"
             title="AI Foundations & Hackathon Prep"
             description="Learn the fundamentals and tools needed to prepare for the AI hackathon."
-            date="October 11, 2026"
+            date="September 25, 2026"
             time="10:00 AM - 12:00 PM"
             venue="Lab A, Block C"
             speaker="[PENDING]"
