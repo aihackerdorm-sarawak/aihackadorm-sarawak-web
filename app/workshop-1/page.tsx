@@ -4,10 +4,12 @@ import { SiteHeader } from '../../components/SiteHeader';
 import WorkshopRegistrationForm from '../../components/WorkshopRegistrationForm';
 import { GraphicsModeProvider } from '../../components/GraphicsMode';
 import { redirect } from "next/navigation";
+import { getCountdownStage } from '../../lib/countdown';
 
 export default function Workshop1Page() {
   const registrationStartDate = new Date("2026-09-18T00:00:00+08:00");
   const currentDate = new Date();
+  const countdownStage = getCountdownStage(currentDate.getTime());
 
   // Teleport the user to the main page if they are early
   if (currentDate < registrationStartDate) {
@@ -17,7 +19,7 @@ export default function Workshop1Page() {
   return (
     <GraphicsModeProvider>
       <main className="min-h-screen bg-[#030303]">
-        <SiteHeader stage={"registration" as any} onNavigate={() => {}} />
+        <SiteHeader stage={countdownStage} onNavigate={() => {}} />
         <div className="pt-24 pb-12 px-4 sm:px-6">
           <WorkshopRegistrationForm 
             workshopId="workshop1"

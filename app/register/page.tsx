@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { connection } from 'next/server';
 import { COUNTDOWN_TARGETS } from '@/lib/countdown';
 import RegistrationForm from '@/components/RegistrationForm';
 import WaveBackground from '@/components/WaveBackground'; // Pulling in your team's wave dots!
@@ -10,9 +11,10 @@ export const metadata: Metadata = {
   description: 'Register for the AI Hackerdorm hackathon.',
 };
 
-export default function RegisterPage() {
-  // 1. Define the launch date and current time
-  // Note: Added +08:00 so it opens exactly at midnight Malaysia time!
+export default async function RegisterPage() {
+  await connection();
+
+  // Define the shared launch date and evaluate the current time per request.
   const launchDate = COUNTDOWN_TARGETS.registration; 
   const now = new Date();
 
