@@ -22,9 +22,9 @@ export type CountdownStage = {
 };
 
 export const COUNTDOWN_TARGETS = {
-  registration: new Date("2026-09-15T00:00:00"),
-  workshop: new Date("2026-09-25T00:00:00"),
-  mainEvent: new Date("2026-10-09T00:00:00"),
+  registration: new Date("2026-09-27T00:00:00"),
+  workshop: new Date("2026-10-05T10:00:00"),
+  mainEvent: new Date("2026-10-10T00:00:00"),
   eventEnds: new Date("2026-10-12T00:00:00"),
 } as const;
 
@@ -47,7 +47,7 @@ export function getCountdownStage(now = Date.now()): CountdownStage {
     return {
       phase: "workshop",
       eyebrow: "Countdown to pre-hackathon workshop",
-      label: "Pre-Hackathon Workshop",
+      label: "Pre-Hackathon Workshop 2",
       target: COUNTDOWN_TARGETS.workshop,
       completed: false,
     };
@@ -70,7 +70,7 @@ export function getCountdownStage(now = Date.now()): CountdownStage {
       label: "Event Completion",
       target: COUNTDOWN_TARGETS.eventEnds,
       completed: false,
-      message: "3 days remaining",
+      message: "2 days remaining",
     };
   }
 

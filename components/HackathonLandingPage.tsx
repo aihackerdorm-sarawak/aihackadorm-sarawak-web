@@ -60,13 +60,15 @@ const scheduleItems: ScheduleItem[] = [
   {
     id: "registration",
     label: "Registration Opens",
-    date: "Sep 15, 2026",
+    date: "Sep 27, 2026",
     hint: "Launch milestone",
     title: "Registration opens",
     copy:
-      "The first live milestone. This is when the page switches from launch countdown into registration countdown mode.",
+      "Hackathon team registration opens. The countdown then moves to the upcoming workshop milestone.",
     status: "Live soon",
   },
+  /* Workshop 1 is temporarily unavailable. Keep this milestone here so it can
+     be restored if the workshop plans change.
   {
     id: "workshop",
     label: "Pre-Hackathon Workshop 1",
@@ -80,6 +82,7 @@ const scheduleItems: ScheduleItem[] = [
     // Placeholder — point to the live workshop registration page when it exists.
     registerHref: "/workshop-1",
   },
+  */
   {
     id: "workshop-2",
     label: "Pre-Hackathon Workshop 2",
@@ -89,19 +92,19 @@ const scheduleItems: ScheduleItem[] = [
     copy:
       "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
     badge: "Tentative",
-    eventStartsAt: "2026-10-05T00:00:00+08:00",
+    eventStartsAt: "2026-10-05T10:00:00+08:00",
     // Placeholder — point to the live workshop registration page when it exists.
     registerHref: "/workshop-2",
   },
   {
     id: "main-event",
     label: "Main Event",
-    date: "Oct 9, 2026",
+    date: "Oct 10, 2026",
     hint: "Build begins",
     title: "Main event begins",
     copy:
-      "The main hackathon start date. The countdown then shifts into the 3-day live event window until completion.",
-    status: "3-day event",
+      "The main hackathon start date. The countdown then shifts into the 2-day live event window until completion.",
+    status: "2-day event",
   },
 ];
 
@@ -596,7 +599,7 @@ function CountdownSection(
           </h2>
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
             {stage.eyebrow}. {stage.phase === "event-live"
-              ? "The main event is live — 3 days on the clock until it wraps up."
+              ? "The main event is live — 2 days on the clock until it wraps up."
               : "This page updates automatically as each milestone — registration, the workshop, and the main event — arrives."}
           </p>
         </div>
@@ -686,7 +689,7 @@ function HeroSection({
             transition={{ duration: 0.6 }}
             className="font-mono text-[10px] font-semibold uppercase tracking-[0.48em] text-white/65"
           >
-            Oct 9-11, 2026 - Kuching, Sarawak - 3 days
+            Oct 10-11, 2026 - Kuching, Sarawak - 2 days
           </motion.p>
 
           <motion.h1
@@ -716,7 +719,7 @@ function HeroSection({
             transition={{ duration: 0.7, delay: 0.08 }}
             className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base"
           >
-            AI Hackerdorm Sarawak is a 3-day hackathon by AI HackerDorm and the
+            AI Hackerdorm Sarawak is a 2-day hackathon by AI HackerDorm and the
             Swinburne Computer Science Club. Students and developers build real
             AI solutions under one roof in Kuching, Borneo.
           </motion.p>
@@ -775,7 +778,7 @@ function HeroSection({
 
           <div className="grid gap-4 sm:grid-cols-2">
             {[
-              { label: "Hackathon", value: "3 days" },
+              { label: "Hackathon", value: "2 days" },
               { label: "Format", value: "Build + mentor" },
               { label: "Location", value: "Kuching" },
               { label: "Focus", value: "AI Solutions" },
