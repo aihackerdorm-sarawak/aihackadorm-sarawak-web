@@ -34,6 +34,7 @@ import {
 import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
 import { FaqAccordion } from "./Faq";
 import RegistrationForm from "./RegistrationForm";
+import { EventGallery } from "./EventGallery";
 
 type ScheduleItem = {
   id: string;
@@ -1308,6 +1309,7 @@ function LandingContent() {
       <div className="relative z-10">
         <SiteHeader onNavigate={navigate} stage={countdown.stage} />
         <HeroSection stage={countdown.stage} onWorkshopsClick={handleWorkshopsClick} />
+        <EventGallery />
         <CountdownSection stage={countdown.stage} values={countdown.values} />
         <WaveZone
           selectedMilestoneId={selectedMilestoneId}

@@ -149,3 +149,20 @@ body {
 .animate-slide-fade {
   animation: slideFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes event-gallery-scroll {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0%);
+  }
+}
+
+.event-gallery-track {
+  animation: event-gallery-scroll 42s linear infinite;
+}
+
+.event-gallery-track:hover {
+  animation-play-state: paused;
+}
