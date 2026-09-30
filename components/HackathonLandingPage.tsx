@@ -26,6 +26,7 @@ import { SiteHeader } from "./SiteHeader";
 import { CountdownScene } from "./CountdownScene";
 import WaveBackground from "./WaveBackground";
 import {
+  HACKATHON_REGISTRATION_URL,
   type CountdownStage,
   formatCountdownParts,
   getCountdownStage,
@@ -33,7 +34,6 @@ import {
 } from "@/lib/countdown";
 import { getDeviceQuality, type QualityTier } from "@/lib/device-quality";
 import { FaqAccordion } from "./Faq";
-import RegistrationForm from "./RegistrationForm";
 import { EventGallery } from "./EventGallery";
 
 type ScheduleItem = {
@@ -65,11 +65,11 @@ const scheduleItems: ScheduleItem[] = [
     hint: "Launch milestone",
     title: "Registration opens",
     copy:
-      "Hackathon team registration opens. The countdown then moves to the upcoming workshop milestone.",
-    status: "Live soon",
+      "Hackathon team registration is open. Sign up your team on the main AI HackerDorm event page.",
+    status: "Open now",
   },
-  /* Workshop 1 is temporarily unavailable. Keep this milestone here so it can
-     be restored if the workshop plans change.
+  /* Workshops 1 and 2 are off the timeline. Kept here so they can be restored
+     if the workshop plans change.
   {
     id: "workshop",
     label: "Pre-Hackathon Workshop 1",
@@ -83,7 +83,6 @@ const scheduleItems: ScheduleItem[] = [
     // Placeholder — point to the live workshop registration page when it exists.
     registerHref: "/workshop-1",
   },
-  */
   {
     id: "workshop-2",
     label: "Pre-Hackathon Workshop 2",
@@ -94,25 +93,30 @@ const scheduleItems: ScheduleItem[] = [
       "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
     badge: "Tentative",
     eventStartsAt: "2026-10-05T10:00:00+08:00",
-    // Placeholder — point to the live workshop registration page when it exists.
     registerHref: "/workshop-2",
   },
+  */
   {
-    id: "main-event",
-    label: "Main Event",
-    date: "Oct 10, 2026",
+    id: "hackathon-start",
+    label: "Hackathon Start",
+    date: "Oct 10, 2026 · 9:00 AM",
     hint: "Build begins",
-    title: "Main event begins",
+    title: "Hackathon starts",
     copy:
-      "The main hackathon start date. The countdown then shifts into the 2-day live event window until completion.",
-    status: "2-day event",
+      "The hackathon kicks off at 9:00 AM Malaysia time (UTC+8). Teams have 24 hours to build.",
+    status: "24-hour build",
+  },
+  {
+    id: "submission",
+    label: "Submission",
+    date: "Oct 11, 2026 · 9:00 AM",
+    hint: "Deadline",
+    title: "Project submission",
+    copy:
+      "Submissions close at 9:00 AM Malaysia time (UTC+8), 24 hours after the start. Make sure your project is in before the deadline.",
+    status: "Hard deadline",
   },
 ];
-
-// Id of the first workshop milestone — the hero "Workshops" button focuses
-// this point on the timeline when clicked.
-const FIRST_WORKSHOP_ID =
-  scheduleItems.find((item) => item.id.startsWith("workshop"))?.id ?? "workshop";
 
 const WORKSHOP_REGISTRATION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -288,17 +292,19 @@ function PrimaryButton({
   onClick?: () => void;
 }) {
   const className =
-    "register-cta inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75";
+    "register-cta inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-7 py-4 text-xs font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75";
 
   if (href && !disabled) {
     return (
       <a
         href={href}
+        target={href.startsWith("http") ? "_blank" : undefined}
+        rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
         className={className}
         data-text={typeof children === "string" ? children : undefined}
       >
         {children}
-        <ArrowRight className="h-3.5 w-3.5" />
+        <ArrowRight className="h-4 w-4" />
       </a>
     );
   }
@@ -313,7 +319,7 @@ function PrimaryButton({
       data-text={typeof children === "string" ? children : undefined}
     >
       {children}
-      <ArrowRight className="h-3.5 w-3.5" />
+      <ArrowRight className="h-4 w-4" />
     </button>
   );
 }
@@ -330,7 +336,7 @@ function getRegistrationCta(stage: CountdownStage) {
   return {
     label: "Register",
     disabled: false,
-    href: "/register",
+    href: HACKATHON_REGISTRATION_URL,
   } as const;
 }
 
@@ -443,9 +449,6 @@ function CountdownWebGLFrame({
 class CountdownWebGLErrorBoundary extends Component<
   {
     values: CountdownValues;
-    stageLabel: string;
-    completed: boolean;
-    message?: string;
     children: ReactNode;
   },
   { hasError: boolean }
@@ -463,12 +466,7 @@ class CountdownWebGLErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <CountdownFallback
-          values={this.props.values}
-          stageLabel={this.props.stageLabel}
-          completed={this.props.completed}
-          message={this.props.message}
-        />
+        <CountdownFallback values={this.props.values} />
       );
     }
 
@@ -476,35 +474,7 @@ class CountdownWebGLErrorBoundary extends Component<
   }
 }
 
-function CountdownFallback({
-  values,
-  stageLabel,
-  completed,
-  message,
-}: {
-  values: CountdownValues;
-  stageLabel: string;
-  completed: boolean;
-  message?: string;
-}) {
-  if (completed) {
-    return (
-      <div className="flex min-h-[260px] items-center justify-center rounded-[30px] border border-white/10 bg-black/35 px-6 py-10 text-center">
-        <div className="max-w-2xl">
-          <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-white/35">
-            {stageLabel}
-          </p>
-          <h3 className="mt-4 text-3xl font-black uppercase tracking-[-0.06em] text-white sm:text-5xl">
-            AI HackerDorm 2026 - Completed
-          </h3>
-          {message
-            ? <p className="mt-4 text-sm text-white/55">{message}</p>
-            : null}
-        </div>
-      </div>
-    );
-  }
-
+function CountdownFallback({ values }: { values: CountdownValues }) {
   return (
     <div className="grid gap-4 rounded-[30px] border border-white/10 bg-black/35 p-5 text-center sm:grid-cols-4 sm:gap-5 sm:p-7">
       {[
@@ -595,24 +565,23 @@ function CountdownSection(
           </p>
           <h2 className="text-4xl font-black uppercase tracking-[-0.08em] text-white sm:text-6xl lg:text-7xl">
             {stage.completed
-              ? "The event has finished."
+              ? "Hackathon complete."
               : `Counting down to ${stage.label}.`}
           </h2>
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
-            {stage.eyebrow}. {stage.phase === "event-live"
-              ? "The main event is live — 2 days on the clock until it wraps up."
-              : "This page updates automatically as each milestone — registration, the workshop, and the main event — arrives."}
+            {stage.completed
+              ? "Submissions are closed. Thank you to everyone who took part!"
+              : stage.phase === "event-live"
+              ? `${stage.eyebrow}. Submissions close 11 October, 9:00 AM Malaysia time (UTC+8).`
+              : `${stage.eyebrow}. The hackathon kicks off on 10 October, 9:00 AM Malaysia time (UTC+8).`}
           </p>
         </div>
 
-        {graphicsEnabled && !stage.completed
+        {/* Shown in every phase — once the hackathon is complete the target is
+            in the past, so formatCountdownParts clamps it to 00 00 00 00. */}
+        {graphicsEnabled
           ? (
-            <CountdownWebGLErrorBoundary
-              values={values}
-              stageLabel={stage.eyebrow}
-              completed={stage.completed}
-              message={stage.message}
-            >
+            <CountdownWebGLErrorBoundary values={values}>
               <CountdownWebGLFrame
                 active={isInView}
                 reducedMotion={reducedMotion}
@@ -623,37 +592,22 @@ function CountdownSection(
             </CountdownWebGLErrorBoundary>
           )
           : (
-            <CountdownFallback
-              values={values}
-              stageLabel={stage.eyebrow}
-              completed={stage.completed}
-              message={stage.message}
-            />
+            <CountdownFallback values={values} />
           )}
 
-        {!stage.completed
-          ? (
-            <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.36em] text-white/32">
-              <span>{stage.label}</span>
-              <span>-</span>
-              <span>
-                {values.days}:{values.hours}:{values.minutes}:{values.seconds}
-              </span>
-            </div>
-          )
-          : null}
+        <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.36em] text-white/32">
+          <span>{stage.label}</span>
+          <span>-</span>
+          <span>
+            {values.days}:{values.hours}:{values.minutes}:{values.seconds}
+          </span>
+        </div>
       </div>
     </section>
   );
 }
 
-function HeroSection({
-  stage,
-  onWorkshopsClick,
-}: {
-  stage: CountdownStage;
-  onWorkshopsClick: () => void;
-}) {
+function HeroSection({ stage }: { stage: CountdownStage }) {
   const reducedMotion = useReducedMotion() ?? true;
   const { graphicsEnabled } = useGraphicsMode();
   const { ref, isInView } = useSectionObserver<HTMLElement>();
@@ -727,14 +681,6 @@ function HeroSection({
 
           <div className="flex flex-wrap items-center gap-3">
             <RegistrationCta stage={stage} />
-            <button
-              type="button"
-              onClick={onWorkshopsClick}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
-            >
-              Workshops
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
           </div>
         </div>
 
@@ -900,7 +846,10 @@ function ScheduleSection({
               <div className="relative min-w-[800px] px-3 pt-2">
                 {/* Connecting line sits on the dot row at the bottom, clear of the text above. */}
                 <div className="pointer-events-none absolute inset-x-3 bottom-4 h-px bg-white/15" />
-                <div className="grid grid-cols-4 gap-4">
+                <div
+                  className="grid gap-4"
+                  style={{ gridTemplateColumns: `repeat(${scheduleItems.length}, minmax(0, 1fr))` }}
+                >
                   {scheduleItems.map((item, index) => {
                     const active = item.id === selectedId;
 
@@ -959,16 +908,13 @@ function ScheduleSection({
           </div>
 
           <div className="overflow-hidden rounded-[24px] border border-white/10 bg-black/30 p-4 sm:p-5">
-            <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-              Shared detail card
-            </p>
-            <h3 className="mt-2 max-w-full break-words text-xl font-black uppercase leading-tight tracking-[-0.05em] text-white sm:text-2xl">
+            <h3 className="max-w-full break-words text-xl font-black uppercase leading-tight tracking-[-0.05em] text-white sm:text-2xl">
               {selected.title}
             </h3>
             <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.28em] text-white/35">
               {selectedIndex + 1} / {scheduleItems.length}
             </p>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-white/55">{selected.copy}</p>
+            <p className="mt-4 text-sm leading-7 text-white/55">{selected.copy}</p>
             {registrationState.status === "open" ? (
               <a
                 href={registrationState.href}
@@ -1181,64 +1127,41 @@ function PartnerSocialSection() {
         title="Support the next generation."
         copy="Want to get involved or follow along? Reach out directly or find us on social media."
       >
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
-            <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-              Partnership notice
-            </p>
-            <h3 className="mt-3 text-2xl font-black uppercase tracking-[-0.05em] text-white">
-              Partnership details coming soon.
-            </h3>
-            <p className="mt-4 text-sm leading-7 text-white/55">
-              Interested in partnering with us? We&apos;re finalizing sponsor
-              and collaboration details and will share them soon — reach out via
-              our socials in the meantime.
-            </p>
-            {
-              /*
-            <div className="mt-5 flex flex-wrap gap-3">
-              <RegisterCta />
-            </div>
-            */
-            }
-          </div>
-
-          <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
-            <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-              Social media
-            </p>
-            <div className="mt-4 space-y-3">
-              {partnerLinks.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  target={item.label === "Email" ? undefined : "_blank"}
-                  rel={item.label === "Email" ? undefined : "noreferrer"}
-                  className="flex items-center justify-between rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4 text-white/72 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/25 text-white/65">
-                      {item.label === "Email"
-                        ? <Mail className="h-4 w-4" />
-                        : item.label === "LinkedIn"
-                        ? (
-                          <span className="text-[13px] font-black leading-none tracking-[-0.08em]">
-                            in
-                          </span>
-                        )
-                        : <Sparkles className="h-4 w-4" />}
-                    </span>
-                    <span className="flex flex-col">
-                      <span className="text-sm font-medium">{item.label}</span>
-                      <span className="text-xs text-white/45">
-                        {item.handle}
-                      </span>
+        <div className="rounded-[24px] border border-white/10 bg-black/30 p-5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+            Social media
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {partnerLinks.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                target={item.label === "Email" ? undefined : "_blank"}
+                rel={item.label === "Email" ? undefined : "noreferrer"}
+                className="flex items-center justify-between gap-3 rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4 text-white/72 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/25 text-white/65">
+                    {item.label === "Email"
+                      ? <Mail className="h-4 w-4" />
+                      : item.label === "LinkedIn"
+                      ? (
+                        <span className="text-[13px] font-black leading-none tracking-[-0.08em]">
+                          in
+                        </span>
+                      )
+                      : <Sparkles className="h-4 w-4" />}
+                  </span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="truncate text-xs text-white/45">
+                      {item.handle}
                     </span>
                   </span>
-                  <ArrowRight className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+              </a>
+            ))}
           </div>
         </div>
       </SectionShell>
@@ -1296,11 +1219,6 @@ function LandingContent() {
   const countdown = useCountdownState();
   const [selectedMilestoneId, setSelectedMilestoneId] = useState(scheduleItems[0].id);
 
-  const handleWorkshopsClick = () => {
-    setSelectedMilestoneId(FIRST_WORKSHOP_ID);
-    navigate("schedule");
-  };
-
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#030303] text-white">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.09),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.05),transparent_24%)]" />
@@ -1308,7 +1226,7 @@ function LandingContent() {
 
       <div className="relative z-10">
         <SiteHeader onNavigate={navigate} stage={countdown.stage} />
-        <HeroSection stage={countdown.stage} onWorkshopsClick={handleWorkshopsClick} />
+        <HeroSection stage={countdown.stage} />
         <EventGallery />
         <CountdownSection stage={countdown.stage} values={countdown.values} />
         <WaveZone
