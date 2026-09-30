@@ -1,42 +1,8 @@
-import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { connection } from 'next/server';
-import { COUNTDOWN_TARGETS } from '@/lib/countdown';
-import RegistrationForm from '@/components/RegistrationForm';
-import WaveBackground from '@/components/WaveBackground'; // Pulling in your team's wave dots!
+import { HACKATHON_REGISTRATION_URL } from '@/lib/countdown';
 
-// This fixes the typo in the browser tab at the top of the screen
-export const metadata: Metadata = {
-  title: 'Register | AI Hackerdorm Sarawak',
-  description: 'Register for the AI Hackerdorm hackathon.',
-};
-
-export default async function RegisterPage() {
-  await connection();
-
-  // Define the shared launch date and evaluate the current time per request.
-  const launchDate = COUNTDOWN_TARGETS.registration; 
-  const now = new Date();
-
-  // 2. The Server-Side Bounce
-  // If the current time is before the launch date, boot them back to the home page
-  if (now < launchDate) {
-    redirect('/');   
-  }
-
-  return (
-    <main className="relative min-h-screen bg-[#030303] flex flex-col items-center justify-center p-6 pt-24 pb-12">
-      
-      {/* The Background Layer (z-0 keeps it in the back) */}
-      <div className="absolute inset-0 z-0 opacity-60 pointer-events-none">
-        <WaveBackground />
-      </div>
-      
-      {/* The Form Layer (z-10 pulls it to the front so you can click it) */}
-      <div className="relative z-10 w-full flex justify-center">
-        <RegistrationForm />
-      </div>
-
-    </main>
-  );
+// Hackathon registration moved to the main AI HackerDorm event page. This
+// route is kept only so old/shared /register links still land somewhere useful.
+export default function RegisterPage() {
+  redirect(HACKATHON_REGISTRATION_URL);
 }
