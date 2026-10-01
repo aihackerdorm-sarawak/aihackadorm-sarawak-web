@@ -4,8 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { ArrowRight, Menu, Sparkles, X } from "lucide-react";
 import { useGraphicsMode } from "./GraphicsMode";
-import type { CountdownStage } from "@/lib/countdown";
-import Link from "next/link";
+import { HACKATHON_REGISTRATION_URL, type CountdownStage } from "@/lib/countdown";
 
 type SiteHeaderProps = {
   onNavigate: (id: string) => void;
@@ -46,7 +45,7 @@ function getHeaderCta(stage: CountdownStage) {
   return {
     label: "Register",
     disabled: false,
-    href: "/register",
+    href: HACKATHON_REGISTRATION_URL,
   } as const;
 }
 
@@ -117,14 +116,16 @@ export function SiteHeader({ onNavigate, stage }: SiteHeaderProps) {
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           ) : (
-            <Link
+            <a
               href={cta.href}
+              target="_blank"
+              rel="noopener noreferrer"
               className="register-cta hidden items-center gap-2 rounded-full border border-white/15 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity sm:inline-flex sm:px-4 sm:py-2 sm:text-[11px]"
               data-text={cta.label}
             >
               {cta.label}
               <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            </a>
           )}
 
           <button
@@ -165,14 +166,16 @@ export function SiteHeader({ onNavigate, stage }: SiteHeaderProps) {
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             ) : (
-              <Link
+              <a
                 href={cta.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="register-cta mt-1 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black"
                 data-text={cta.label}
               >
                 {cta.label}
                 <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
+              </a>
             )}
           </div>
         </nav>
