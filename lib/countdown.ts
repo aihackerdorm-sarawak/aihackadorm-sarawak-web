@@ -1,5 +1,6 @@
 export type CountdownPhase =
   | "registration"
+  | "workshop"
   | "main-event"
   | "event-live"
   | "completed";
@@ -21,12 +22,10 @@ export type CountdownStage = {
 };
 
 export const COUNTDOWN_TARGETS = {
-  // All times are Malaysia time (UTC+8) - the explicit offset keeps the
-  // countdown correct for viewers in any timezone.
-  registration: new Date("2026-09-27T00:00:00+08:00"),
-  mainEvent: new Date("2026-10-10T09:00:00+08:00"),
-  // Submission deadline, 24 hours after the start.
-  eventEnds: new Date("2026-10-11T09:00:00+08:00"),
+  workshop: new Date("2026-09-25T00:00:00"),
+  registration: new Date("2026-09-27T00:00:00"),
+  mainEvent: new Date("2026-10-10T00:00:00"),
+  eventEnds: new Date("2026-10-12T00:00:00"),
 } as const;
 
 function remainingUntil(target: Date, now: number) {
@@ -34,6 +33,16 @@ function remainingUntil(target: Date, now: number) {
 }
 
 export function getCountdownStage(now = Date.now()): CountdownStage {
+  if (now < COUNTDOWN_TARGETS.workshop.getTime()) {
+    return {
+      phase: "workshop",
+      eyebrow: "Countdown to Hermes Event Workshop",
+      label: "Hermes Event Workshop",
+      target: COUNTDOWN_TARGETS.workshop,
+      completed: false,
+    };
+  }
+
   if (now < COUNTDOWN_TARGETS.registration.getTime()) {
     return {
       phase: "registration",
@@ -47,8 +56,8 @@ export function getCountdownStage(now = Date.now()): CountdownStage {
   if (now < COUNTDOWN_TARGETS.mainEvent.getTime()) {
     return {
       phase: "main-event",
-      eyebrow: "Countdown to hackathon day",
-      label: "Hackathon Day",
+      eyebrow: "Countdown to the Hackathon",
+      label: "The Hackathon",
       target: COUNTDOWN_TARGETS.mainEvent,
       completed: false,
     };
@@ -57,18 +66,18 @@ export function getCountdownStage(now = Date.now()): CountdownStage {
   if (now < COUNTDOWN_TARGETS.eventEnds.getTime()) {
     return {
       phase: "event-live",
-      eyebrow: "The hackathon is live",
-      label: "Submission Deadline",
+      eyebrow: "The Hackathon is live",
+      label: "Event Completion",
       target: COUNTDOWN_TARGETS.eventEnds,
       completed: false,
-      message: "Submissions close 11 October, 9:00 AM",
+      message: "2 days remaining",
     };
   }
 
   return {
     phase: "completed",
-    eyebrow: "Hackathon complete",
-    label: "Hackathon Complete",
+    eyebrow: "Season complete",
+    label: "AI HackerDorm 2026",
     target: COUNTDOWN_TARGETS.eventEnds,
     completed: true,
     message: "AI HackerDorm 2026 — Completed",
@@ -90,9 +99,3 @@ export function formatCountdownParts(target: Date, now = Date.now()): CountdownP
 export function padTwo(value: number) {
   return String(value).padStart(2, "0");
 }
-
-
-// Hackathon registration is handled on the main AI HackerDorm site — every
-// "Register" CTA (and the legacy /register route) points here.
-export const HACKATHON_REGISTRATION_URL =
-  "https://www.aihackerdorm.com/events/dormathon-2026-malaysia-s-nationwide-hackathon-build-the-next-big-thing";

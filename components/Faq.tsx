@@ -13,16 +13,16 @@ export const faqs: FaqItem[] = [
   {
     question: "Do you need coding knowledge before competing in this hackathon?",
     answer:
-      "Not at all! This is an AI-focused hackathon, so you're expected to build with AI tools rather than write everything by hand. We'll provide AI tokens to every participant, so all you need to bring is your ideas.",
+      "Not at all! Since this is an AI-focused hackathon, you don't need any prior coding knowledge. We will also host a workshop to teach you everything you need to know to compete.",
   },
   {
     question: "Are we required to pay for this event?",
-    answer: "Yes, registration is RM10 per person.",
+    answer: "Yes, there is a registration fee of RM10 per person.",
   },
   {
     question: "Can I join solo, or is the hackathon team-based?",
     answer:
-      "Either works! You can join solo, or form a team of up to 4 people.",
+      "You can join either solo or as part of a team. Teams can have a maximum of 4 members..",
   },
 ];
 
