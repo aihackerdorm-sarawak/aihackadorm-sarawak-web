@@ -59,52 +59,34 @@ type CountdownValues = {
 
 const scheduleItems: ScheduleItem[] = [
   {
+    id: "workshop",
+    label: "Hermes Workshop",
+    date: "Sep 25, 2026",
+    hint: "Warm-up session",
+    title: "Hermes Workshop",
+    copy:
+      "A hands-on warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
+    eventStartsAt: "2026-09-25T00:00:00+08:00",
+    registerHref: "https://www.aihackerdorm.com/events/hermes-agent-workshop",
+  },
+  {
     id: "registration",
     label: "Registration Opens",
     date: "Sep 27, 2026",
     hint: "Launch milestone",
     title: "Registration opens",
     copy:
-      "Hackathon team registration opens. The countdown then moves to the upcoming workshop milestone.",
+      "Team registration is now open! Get your team ready and prepare for the upcoming hackathon",
     status: "Live soon",
   },
-  /* Workshop 1 is temporarily unavailable. Keep this milestone here so it can
-     be restored if the workshop plans change.
   {
-    id: "workshop",
-    label: "Pre-Hackathon Workshop 1",
-    date: "Sep 25, 2026",
-    hint: "Warm-up session",
-    title: "Pre-hackathon workshop 1",
-    copy:
-      "A tentative warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
-    badge: "Tentative",
-    eventStartsAt: "2026-09-25T00:00:00+08:00",
-    // Placeholder — point to the live workshop registration page when it exists.
-    registerHref: "/workshop-1",
-  },
-  */
-  {
-    id: "workshop-2",
-    label: "Pre-Hackathon Workshop 2",
-    date: "Oct 5, 2026",
-    hint: "Deep dive session",
-    title: "Pre-hackathon workshop 2",
-    copy:
-      "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
-    badge: "Tentative",
-    eventStartsAt: "2026-10-05T10:00:00+08:00",
-    // Placeholder — point to the live workshop registration page when it exists.
-    registerHref: "/workshop-2",
-  },
-  {
-    id: "main-event",
-    label: "Main Event",
+    id: "Hackathon",
+    label: "Hackathon",
     date: "Oct 10, 2026",
     hint: "Build begins",
-    title: "Main event begins",
+    title: "Hackathon begins",
     copy:
-      "The main hackathon start date. The countdown then shifts into the 2-day live event window until completion.",
+      "The 2-day hackathon officially kicks off!",
     status: "2-day event",
   },
 ];
@@ -289,11 +271,14 @@ function PrimaryButton({
 }) {
   const className =
     "register-cta inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-opacity disabled:cursor-not-allowed disabled:opacity-75";
+  const isExternal = href?.startsWith("http");
 
   if (href && !disabled) {
     return (
       <a
         href={href}
+        target={isExternal ? "_blank" : undefined}
+        rel={isExternal ? "noopener noreferrer" : undefined}
         className={className}
         data-text={typeof children === "string" ? children : undefined}
       >
@@ -330,7 +315,7 @@ function getRegistrationCta(stage: CountdownStage) {
   return {
     label: "Register",
     disabled: false,
-    href: "/register",
+    href: "https://www.aihackerdorm.com/events/dormathon-2026-malaysia-s-nationwide-hackathon-build-the-next-big-thing",
   } as const;
 }
 
@@ -595,13 +580,11 @@ function CountdownSection(
           </p>
           <h2 className="text-4xl font-black uppercase tracking-[-0.08em] text-white sm:text-6xl lg:text-7xl">
             {stage.completed
-              ? "The event has finished."
+              ? "The Hackathon has finished."
               : `Counting down to ${stage.label}.`}
           </h2>
           <p className="max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
-            {stage.eyebrow}. {stage.phase === "event-live"
-              ? "The main event is live — 2 days on the clock until it wraps up."
-              : "This page updates automatically as each milestone — registration, the workshop, and the main event — arrives."}
+            Every SECOND counts. See you at the HACKATHON!  
           </p>
         </div>
 
@@ -972,6 +955,8 @@ function ScheduleSection({
             {registrationState.status === "open" ? (
               <a
                 href={registrationState.href}
+                target={registrationState.href?.startsWith("http") ? "_blank" : undefined}
+                rel={registrationState.href?.startsWith("http") ? "noopener noreferrer" : undefined}
                 className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-black transition-colors hover:bg-cyan-400"
               >
                 Register for this workshop

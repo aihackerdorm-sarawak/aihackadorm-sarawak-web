@@ -22,8 +22,8 @@ export type CountdownStage = {
 };
 
 export const COUNTDOWN_TARGETS = {
+  workshop: new Date("2026-09-25T00:00:00"),
   registration: new Date("2026-09-27T00:00:00"),
-  workshop: new Date("2026-10-05T10:00:00"),
   mainEvent: new Date("2026-10-10T00:00:00"),
   eventEnds: new Date("2026-10-12T00:00:00"),
 } as const;
@@ -33,6 +33,16 @@ function remainingUntil(target: Date, now: number) {
 }
 
 export function getCountdownStage(now = Date.now()): CountdownStage {
+  if (now < COUNTDOWN_TARGETS.workshop.getTime()) {
+    return {
+      phase: "workshop",
+      eyebrow: "Countdown to Hermes Event Workshop",
+      label: "Hermes Event Workshop",
+      target: COUNTDOWN_TARGETS.workshop,
+      completed: false,
+    };
+  }
+
   if (now < COUNTDOWN_TARGETS.registration.getTime()) {
     return {
       phase: "registration",
@@ -43,21 +53,11 @@ export function getCountdownStage(now = Date.now()): CountdownStage {
     };
   }
 
-  if (now < COUNTDOWN_TARGETS.workshop.getTime()) {
-    return {
-      phase: "workshop",
-      eyebrow: "Countdown to pre-hackathon workshop",
-      label: "Pre-Hackathon Workshop 2",
-      target: COUNTDOWN_TARGETS.workshop,
-      completed: false,
-    };
-  }
-
   if (now < COUNTDOWN_TARGETS.mainEvent.getTime()) {
     return {
       phase: "main-event",
-      eyebrow: "Countdown to the main event",
-      label: "Main Event",
+      eyebrow: "Countdown to the Hackathon",
+      label: "The Hackathon",
       target: COUNTDOWN_TARGETS.mainEvent,
       completed: false,
     };
@@ -66,7 +66,7 @@ export function getCountdownStage(now = Date.now()): CountdownStage {
   if (now < COUNTDOWN_TARGETS.eventEnds.getTime()) {
     return {
       phase: "event-live",
-      eyebrow: "The main event is live",
+      eyebrow: "The Hackathon is live",
       label: "Event Completion",
       target: COUNTDOWN_TARGETS.eventEnds,
       completed: false,
@@ -99,4 +99,3 @@ export function formatCountdownParts(target: Date, now = Date.now()): CountdownP
 export function padTwo(value: number) {
   return String(value).padStart(2, "0");
 }
-

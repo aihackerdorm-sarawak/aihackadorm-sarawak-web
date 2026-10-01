@@ -17,12 +17,12 @@ export const faqs: FaqItem[] = [
   },
   {
     question: "Are we required to pay for this event?",
-    answer: "It's completely free!",
+    answer: "Yes, there is a registration fee of RM10 per person.",
   },
   {
     question: "Can I join solo, or is the hackathon team-based?",
     answer:
-      "This is a team-based hackathon, you'll build with a team during the event.",
+      "You can join either solo or as part of a team. Teams can have a maximum of 4 members..",
   },
 ];
 
