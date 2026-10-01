@@ -65,37 +65,10 @@ const scheduleItems: ScheduleItem[] = [
     hint: "Launch milestone",
     title: "Registration opens",
     copy:
-      "Hackathon team registration is open. Sign up your team on the main AI HackerDorm event page.",
+      "Registration is now open! Sign up and secure your spot in the AI Hackerdorm hackathon.",
     status: "Open now",
   },
-  /* Workshops 1 and 2 are off the timeline. Kept here so they can be restored
-     if the workshop plans change.
-  {
-    id: "workshop",
-    label: "Pre-Hackathon Workshop 1",
-    date: "Sep 25, 2026",
-    hint: "Warm-up session",
-    title: "Pre-hackathon workshop 1",
-    copy:
-      "A tentative warm-up session to help teams prepare, meet mentors, and calibrate ideas before the main build window.",
-    badge: "Tentative",
-    eventStartsAt: "2026-09-25T00:00:00+08:00",
-    // Placeholder — point to the live workshop registration page when it exists.
-    registerHref: "/workshop-1",
-  },
-  {
-    id: "workshop-2",
-    label: "Pre-Hackathon Workshop 2",
-    date: "Oct 5, 2026",
-    hint: "Deep dive session",
-    title: "Pre-hackathon workshop 2",
-    copy:
-      "A second warm-up session to go deeper on the tools and techniques teams will use during the main build window.",
-    badge: "Tentative",
-    eventStartsAt: "2026-10-05T10:00:00+08:00",
-    registerHref: "/workshop-2",
-  },
-  */
+
   {
     id: "hackathon-start",
     label: "Hackathon Start",
@@ -103,7 +76,7 @@ const scheduleItems: ScheduleItem[] = [
     hint: "Build begins",
     title: "Hackathon starts",
     copy:
-      "The hackathon kicks off at 9:00 AM Malaysia time (UTC+8). Teams have 24 hours to build.",
+      "The hackathon is officially begins!",
     status: "24-hour build",
   },
   {
@@ -113,7 +86,7 @@ const scheduleItems: ScheduleItem[] = [
     hint: "Deadline",
     title: "Project submission",
     copy:
-      "Submissions close at 9:00 AM Malaysia time (UTC+8), 24 hours after the start. Make sure your project is in before the deadline.",
+      "The clock is ticking! Submit your project by 9:00 AM (UTC+8), exactly 24 hours after the hackathon begins. Don’t miss the deadline!",
     status: "Hard deadline",
   },
 ];
@@ -749,24 +722,73 @@ function HeroSection({ stage }: { stage: CountdownStage }) {
   );
 }
 
+type Sponsor = {
+  name: string;
+  logo: string; // path under
+  url: string; // their website
+};
+
+const sponsors: Sponsor[] = [
+    { name: "Odra Venture", logo: "/odra-ventures-logo.png", url: "https://odraventure.com" },
+    { name: "WorkBuddy", logo: "/work_buddy_logo.png", url: "https://www.workbuddy.ai" },
+    { name: "TencentCloud", logo: "/tencent_cloud_logo.png", url: "https://www.tencentcloud.com" },
+    { name: "GrafiLab", logo: "/grafi_lab_logo.png", url: "https://grafilab.ai" },
+    { name: "The Access Group", logo: "/the_access_group_logo.png", url: "https://www.theaccessgroup.com/en-my/" },
+    { name: "BuilderX", logo: "/builder_x_logo.png", url: "https://www.builderx.club" },
+]
+
 function SponsorsSection() {
+  const hasSponsors = sponsors.length > 0;
+
   return (
     <SectionReveal id="sponsors" className="scroll-mt-28" delay={0.04}>
       <SectionShell
         eyebrow="Sponsors"
-        title="Partners coming soon."
-        copy="Sponsor partners will be announced as they're confirmed — check back closer to the event."
+        title={hasSponsors ? "Our partners." : "Partners coming soon."}
+        copy={
+          hasSponsors
+            ? "Thank you to the partners making AI HackerDorm Sarawak possible."
+            : "Sponsor partners will be announced as they're confirmed — check back closer to the event."
+        }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          {["Logo TBC", "Logo TBC"].map((label, index) => (
-            <div
-              key={`${label}-${index}`}
-              className="flex min-h-28 items-center justify-center rounded-[24px] border border-white/10 bg-black/30 text-sm uppercase tracking-[0.28em] text-white/28"
-            >
-              {label}
-            </div>
-          ))}
-        </div>
+        {hasSponsors ? (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+            {sponsors.map((sponsor) => (
+              <a
+                key={sponsor.name}
+                href={sponsor.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${sponsor.name} (opens in a new tab)`}
+                className="group flex flex-col items-center gap-3 text-center"
+              >
+                <div className="relative h-16 w-16 overflow-hidden rounded-xl transition group-hover:scale-105">
+                  <Image
+                    src={sponsor.logo}
+                    alt={sponsor.name}
+                    fill
+                    sizes="64px"
+                    className="object-cover"
+                  />
+                </div>
+                <span className="text-sm font-medium text-white/60 transition group-hover:text-white">
+                  {sponsor.name}
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {["Logo TBC", "Logo TBC"].map((label, index) => (
+              <div
+                key={`${label}-${index}`}
+                className="flex min-h-28 items-center justify-center rounded-[24px] border border-white/10 bg-black/30 text-sm uppercase tracking-[0.28em] text-white/28"
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+        )}
       </SectionShell>
     </SectionReveal>
   );
@@ -950,36 +972,101 @@ function ScheduleSection({
   );
 }
 
+const prizeTracks = [
+  {
+    name: "Track 1",
+    prizes: [
+      { place: "1st", cash: 1200, assets: 1000 },
+      { place: "2nd", cash: 1000, assets: 500 },
+      { place: "3rd", cash: 500, assets: 500 },
+    ],
+  },
+  {
+    name: "Track 2",
+    prizes: [
+      { place: "1st", cash: 1200, assets: 1000 },
+      { place: "2nd", cash: 1000, assets: 500 },
+      { place: "3rd", cash: 500, assets: 500 },
+    ],
+  },
+];
+
+const formatAmount = (value: number) => value.toLocaleString("en-US");
+
 function BenefitsSection() {
   return (
     <SectionReveal id="benefits" className="scroll-mt-28" delay={0.08}>
       <SectionShell
         eyebrow="Benefits & Prizes"
         title="What you win."
-        copy="Prize details will be announced closer to the event — stay tuned."
+        copy="Two tracks, three winners each. Every podium place takes home cash plus assets."
       >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {benefitCards.map((label, index) => (
-            <div
-              key={`${label}-${index}`}
-              className="rounded-[24px] border border-white/10 bg-black/30 p-5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/65">
-                  <Trophy className="h-4 w-4" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {prizeTracks.map((track) => {
+            const totalCash = track.prizes.reduce((sum, p) => sum + p.cash, 0);
+            const totalAssets = track.prizes.reduce((sum, p) => sum + p.assets, 0);
+
+            return (
+              <div
+                key={track.name}
+                className="rounded-[24px] border border-white/10 bg-black/30 p-5"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/65">
+                    <Trophy className="h-4 w-4" />
+                  </div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
+                    Prize
+                  </p>
                 </div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-white/35">
-                  Prize
+
+                <p className="mt-5 text-lg font-black uppercase tracking-[-0.04em] text-white">
+                  {track.name}
                 </p>
+
+                <ul className="mt-4 divide-y divide-white/10">
+                  {track.prizes.map((prize) => (
+                    <li
+                      key={prize.place}
+                      className="flex items-center justify-between gap-4 py-3 text-sm"
+                    >
+                      <span className="font-mono text-xs uppercase tracking-[0.28em] text-white/45">
+                        {prize.place}
+                      </span>
+                      <span className="text-right text-white/80">
+                        <span className="font-semibold text-white">
+                          {formatAmount(prize.cash)}
+                        </span>{" "}
+                        cash{" "}
+                        <span className="text-white/35">+</span>{" "}
+                        <span className="font-semibold text-white">
+                          {formatAmount(prize.assets)}
+                        </span>{" "}
+                        assets
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-2 flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-sm">
+                  <span className="font-mono text-xs uppercase tracking-[0.28em] text-white/45">
+                    Total
+                  </span>
+                  <span className="text-right text-white/80">
+                    <span className="font-semibold text-cyan-300">
+                      {formatAmount(totalCash)}
+                    </span>{" "}
+                    cash{" "}
+                    <span className="text-white/35">+</span>{" "}
+                    <span className="font-semibold text-cyan-300">
+                      {formatAmount(totalAssets)}
+                    </span>{" "}
+                    assets
+                  </span>
+                </div>
               </div>
-              <p className="mt-5 text-lg font-black uppercase tracking-[-0.04em] text-white">
-                {label}
-              </p>
-              <p className="mt-2 text-sm leading-7 text-white/48">
-                Details will be revealed closer to the event.
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </SectionShell>
     </SectionReveal>
@@ -1227,8 +1314,8 @@ function LandingContent() {
       <div className="relative z-10">
         <SiteHeader onNavigate={navigate} stage={countdown.stage} />
         <HeroSection stage={countdown.stage} />
-        <EventGallery />
         <CountdownSection stage={countdown.stage} values={countdown.values} />
+        <EventGallery />
         <WaveZone
           selectedMilestoneId={selectedMilestoneId}
           onSelectMilestone={setSelectedMilestoneId}
